@@ -401,19 +401,40 @@ function syncFullscreenButton() {
  * Nothing scrolls and nothing is cut off; it just gets smaller.
  */
 const MIN_LAYOUT_W = 250;   // face-min + side padding, and room for the controls
+
+/**
+ * Two arrangements: controls below the clock (default) or beside it
+ * (`html.wide`). On every resize we lay out both, measure how big the clock
+ * face comes out in each, and keep whichever gives the bigger clock; wide,
+ * short windows therefore get the side-by-side layout.
+ */
 function fitToWindow() {
+  const stacked = applyLayout(false);
+  const wide = applyLayout(true);
+  if (stacked.face >= wide.face) applyLayout(false);
+}
+
+/** Apply one arrangement, scale it to fit, and report the resulting face size (screen px). */
+function applyLayout(wide) {
   const root = document.documentElement;
+  root.classList.toggle('wide', wide);
   const faceMin = parseFloat(getComputedStyle(root).getPropertyValue('--face-min')) || 200;
   const stage = document.querySelector('.stage');
   const controls = document.getElementById('controls');
   let s = Math.min(1, innerWidth / MIN_LAYOUT_W);
-  // Controls can re-wrap when the layout width changes, so settle in a few passes.
+  // Controls can re-wrap when the layout size changes, so settle in a few passes.
   for (let i = 0; i < 3; i++) {
     root.style.setProperty('--ui-scale', String(s));
-    const needH = faceMin + parseFloat(getComputedStyle(stage).paddingTop) + controls.offsetHeight;
-    s = Math.min(1, innerWidth / MIN_LAYOUT_W, innerHeight / needH);
+    const cs = getComputedStyle(stage);
+    const padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+    const needW = wide ? faceMin + padX + controls.offsetWidth : MIN_LAYOUT_W;
+    const needH = wide ? Math.max(faceMin + padY, controls.offsetHeight)
+                       : faceMin + padY + controls.offsetHeight;
+    s = Math.min(1, innerWidth / needW, innerHeight / needH);
   }
   root.style.setProperty('--ui-scale', String(s));
+  return { s, face: el.face.getBoundingClientRect().width };
 }
 
 function writeInputs(ms) {
