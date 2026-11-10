@@ -367,16 +367,53 @@ function changed() {
 
 function syncControls() {
   const running = state.status === 'running';
-  el.startBtn.textContent = running ? 'Pause' : state.status === 'paused' ? 'Resume'
-    : state.status === 'done' ? 'Dismiss' : 'Start';
+  const [icon, label] = running ? ['pause', 'Pause'] : state.status === 'paused' ? ['play', 'Resume']
+    : state.status === 'done' ? ['stop', 'Dismiss'] : ['play', 'Start'];
+  setIcon(el.startBtn, icon, label, 'Space');
   for (const inp of [el.inH, el.inM, el.inS]) inp.disabled = running;
   el.presets.setAttribute('aria-disabled', String(running));
   el.presetSelect.disabled = running;
-  el.muteBtn.textContent = state.muted ? 'Muted' : 'Sound on';
+  setIcon(el.muteBtn, state.muted ? 'muted' : 'sound', state.muted ? 'Unmute' : 'Mute', 'M');
   el.muteBtn.setAttribute('aria-pressed', String(state.muted));
+  syncFullscreenButton();
   if (document.activeElement && ![el.inH, el.inM, el.inS].includes(document.activeElement)) {
     writeInputs(state.duration);
   }
+}
+
+function setIcon(btn, icon, label, key) {
+  const use = btn.querySelector('use');
+  if (use.getAttribute('href') !== `#i-${icon}`) use.setAttribute('href', `#i-${icon}`);
+  btn.setAttribute('aria-label', label);
+  btn.title = `${label} (${key})`;
+}
+
+function syncFullscreenButton() {
+  const fs = !!document.fullscreenElement;
+  setIcon(el.fsBtn, fs ? 'fs-exit' : 'fs', fs ? 'Exit fullscreen' : 'Fullscreen', 'F');
+}
+
+/*
+ * Never let the window hide the clock. Browsers offer no way to set a minimum
+ * window size, so instead .app is always laid out big enough for a
+ * --face-min clock plus the controls (as they actually measure at that width);
+ * if the window is smaller, the whole of .app is scaled down uniformly to fit.
+ * Nothing scrolls and nothing is cut off; it just gets smaller.
+ */
+const MIN_LAYOUT_W = 250;   // face-min + side padding, and room for the controls
+function fitToWindow() {
+  const root = document.documentElement;
+  const faceMin = parseFloat(getComputedStyle(root).getPropertyValue('--face-min')) || 200;
+  const stage = document.querySelector('.stage');
+  const controls = document.getElementById('controls');
+  let s = Math.min(1, innerWidth / MIN_LAYOUT_W);
+  // Controls can re-wrap when the layout width changes, so settle in a few passes.
+  for (let i = 0; i < 3; i++) {
+    root.style.setProperty('--ui-scale', String(s));
+    const needH = faceMin + parseFloat(getComputedStyle(stage).paddingTop) + controls.offsetHeight;
+    s = Math.min(1, innerWidth / MIN_LAYOUT_W, innerHeight / needH);
+  }
+  root.style.setProperty('--ui-scale', String(s));
 }
 
 function writeInputs(ms) {
@@ -418,6 +455,8 @@ function bindEvents() {
   el.resetBtn.addEventListener('click', reset);
   el.muteBtn.addEventListener('click', toggleMute);
   el.fsBtn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('fullscreenchange', syncFullscreenButton);
+  addEventListener('resize', fitToWindow);
 
   el.presets.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-min]');
@@ -506,6 +545,7 @@ function applyUrlParams() {
 }
 
 function boot() {
+  fitToWindow();
   buildDial();
   load();
   bindEvents();

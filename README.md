@@ -16,8 +16,8 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **State survives a reload** or closing the window, because the timer stores an end *timestamp* in `localStorage`.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
-- **Controls always visible.** The controls at the bottom never fade or hide. When the window gets smaller, the clock face shrinks and the controls get more compact.
-- **Minimum clock size.** The face never shrinks below 200 px (`--face-min` in `styles.css`). Browsers have no API to stop a window from being resized smaller, so in a window smaller than face + controls the page scrolls and the controls stay pinned to the bottom edge.
+- **Controls always visible.** The controls at the bottom never fade or hide. The action buttons are icons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. When the window gets smaller, the clock face shrinks and the controls get more compact.
+- **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than face + controls, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the face and controls stay fully visible at any window size, just smaller.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
 No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.
@@ -84,15 +84,15 @@ Because the service worker is network-first with a cache fallback, the installed
 
 | Action | Mouse | Keyboard |
 |---|---|---|
-| Start / pause / resume | click the face or **Start** | `Space` |
-| Dismiss the alarm | click the face or **Dismiss** | `Space` / `Esc` |
-| Reset | **Reset** | `R` / `Esc` |
+| Start / pause / resume | click the face or ▶ / ❚❚ | `Space` |
+| Dismiss the alarm | click the face or ■ | `Space` / `Esc` |
+| Reset | ⟲ | `R` / `Esc` |
 | ±1 minute (works while running too) | | `↑` `↓` or `+` `-` |
 | ±10 minutes | | `Shift`+`↑` / `Shift`+`↓` |
 | Set an exact time | type into the `hh : mm : ss` fields, then `Enter` to start | |
 | Presets | 1m 5m 10m 15m 25m 45m 1h. In small windows (height ≤ 520 px or width ≤ 380 px) the buttons fold into a **Preset…** dropdown next to the time fields. | |
-| Mute | **Sound on/Muted** | `M` |
-| Fullscreen | **Fullscreen** | `F` |
+| Mute / unmute | speaker icon | `M` |
+| Fullscreen | ⛶ | `F` |
 
 The page also accepts URL parameters: `http://localhost:8765/?t=25m&autostart=1`. They are removed from the address after they're applied, so reloading the page doesn't restart the timer.
 

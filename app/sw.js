@@ -11,7 +11,7 @@
  * Bump VERSION when the asset list changes.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const CACHE = `countdown-${VERSION}`;
 const ASSETS = [
   './',

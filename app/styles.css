@@ -13,8 +13,8 @@
   --btn: #1c232d;
   --btn-hover: #263040;
   --current: var(--accent);
-  /* The clock never shrinks below this; if the window is smaller than
-     face + controls, the page scrolls instead. */
+  /* The clock is never laid out smaller than this; in a window too small
+     for face + controls, app.js scales the whole UI down instead. */
   --face-min: 200px;
 }
 
@@ -41,15 +41,27 @@
 html, body { height: 100%; margin: 0; }
 
 body {
-  display: grid;
-  grid-template-rows: minmax(calc(var(--face-min) + 12px), 1fr) auto;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  min-width: calc(var(--face-min) + 24px);
-  overflow: auto;
+  overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* --ui-scale is set by app.js: 1 normally, < 1 when the window is smaller than
+   the minimum layout. .app is then laid out larger (100vw / scale) and scaled
+   back down, so it exactly fills the window with everything still visible. */
+.app {
+  --s: var(--ui-scale, 1);
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  width: calc(100vw / var(--s));
+  height: calc(100vh / var(--s));
+  transform: scale(var(--s));
+  transform-origin: 0 0;
 }
 
 /* ---------- clock face ---------- */
@@ -58,12 +70,12 @@ body {
   container-type: size;
   display: grid;
   place-items: center;
-  min-height: calc(var(--face-min) + 12px);
+  min-height: 0;
   padding: 12px 12px 0;
 }
 
 .face {
-  --size: max(var(--face-min), min(100cqw, 100cqh));
+  --size: min(100cqw, 100cqh);   /* app.js keeps this >= --face-min */
   width: var(--size);
   height: var(--size);
   position: relative;
@@ -171,11 +183,6 @@ body {
   gap: 10px;
   justify-items: center;
   padding: 12px 12px 16px;
-  /* If the window is smaller than face + controls, the page scrolls; sticky
-     keeps the controls pinned to the bottom edge so they never leave view. */
-  position: sticky;
-  bottom: 0;
-  background: var(--bg);
 }
 
 .row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
@@ -192,7 +199,25 @@ button, .setter input, .preset-select {
 button { padding: 6px 12px; cursor: pointer; }
 button:hover { background: var(--btn-hover); }
 button:focus-visible, .setter input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; min-width: 84px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+
+button.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 34px;
+  padding: 0;
+}
+button.icon.primary { width: 60px; }
+button.icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 button.primary:hover { filter: brightness(1.1); }
 button[aria-pressed="true"] { color: var(--muted); }
 
@@ -225,7 +250,7 @@ button[aria-pressed="true"] { color: var(--muted); }
 }
 
 /* The controls never hide: on short windows they get tighter and the face
-   shrinks instead, down to --face-min; below that the page scrolls. */
+   shrinks instead, down to --face-min; below that app.js scales the whole UI. */
 /* Small windows: fold the row of preset buttons into the dropdown. */
 @media (max-height: 520px), (max-width: 380px) {
   .presets { display: none; }
@@ -237,6 +262,9 @@ button[aria-pressed="true"] { color: var(--muted); }
   .controls { gap: 6px; padding: 8px 8px 10px; }
   button { padding: 3px 9px; font-size: 13px; }
   .presets button { padding: 2px 7px; font-size: 12px; }
+  button.icon { padding: 0; width: 38px; height: 30px; }
+  button.icon.primary { width: 52px; }
+  button.icon svg { width: 18px; height: 18px; }
   .setter input, .colon { font-size: 15px; }
   .setter input { padding: 2px 0; }
 }
