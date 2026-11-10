@@ -112,3 +112,7 @@ app/
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
 - **Multiple windows:** windows of this app stay in sync through the `storage` event.
 - **Regenerating icons:** the PNG icons were rendered from the SVGs in `app/icons/` with headless Chromium. If you change the SVGs, re-render them (e.g. `rsvg-convert -w 512 icon.svg > icon-512.png` from `librsvg2-bin`) and bump `VERSION` in `sw.js`.
+
+## License
+
+[MIT](LICENSE) © 2026 Daniel Pflager
