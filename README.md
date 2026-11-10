@@ -2,8 +2,8 @@
 
 A small, dependency-free countdown timer you can install as a PWA (Progressive Web App). It runs on `localhost` in a chrome-less browser window.
 
-- **Analog face: an analog clock running backwards to "zero hour".** Minute ticks are labelled 0–55 clockwise, like a clock face. All three hands show time *remaining*, move **counter-clockwise**, and meet at 12 when the countdown reaches zero:
-  - **little hand:** hours remaining, one turn per 12 h. It points at "5" for 1 h, "10" for 2 h, and so on.
+- **Analog face: an analog clock running backwards to "zero hour".** The outer ring has minute ticks labelled 0–55, and an inner ring has small hour numerals 0–11. Both are numbered clockwise like a clock face, with 0 at the top. All three hands show time *remaining*, move **counter-clockwise**, and meet at 12 when the countdown reaches zero:
+  - **little hand:** hours remaining, one turn per 12 h, read against the inner hour numerals.
   - **big hand** (the one with the knob): minutes remaining within the hour, one turn per hour. The coloured arc from 12 o'clock to it is the time left in the current hour. A faint full ring means more than an hour remains.
   - **sweep hand** (thin, coral): seconds remaining within the minute, one turn per minute.
 
@@ -16,7 +16,8 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **State survives a reload** or closing the window, because the timer stores an end *timestamp* in `localStorage`.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
-- **Controls always visible.** The controls at the bottom never fade or hide. When the window gets smaller, the clock face shrinks and the controls get more compact, so they are never cut off.
+- **Controls always visible.** The controls at the bottom never fade or hide. When the window gets smaller, the clock face shrinks and the controls get more compact.
+- **Minimum clock size.** The face never shrinks below 200 px (`--face-min` in `styles.css`). Browsers have no API to stop a window from being resized smaller, so in a window smaller than face + controls the page scrolls and the controls stay pinned to the bottom edge.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
 No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.

@@ -13,6 +13,9 @@
   --btn: #1c232d;
   --btn-hover: #263040;
   --current: var(--accent);
+  /* The clock never shrinks below this; if the window is smaller than
+     face + controls, the page scrolls instead. */
+  --face-min: 200px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -39,11 +42,12 @@ html, body { height: 100%; margin: 0; }
 
 body {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(calc(var(--face-min) + 12px), 1fr) auto;
   background: var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
-  overflow: hidden;
+  min-width: calc(var(--face-min) + 24px);
+  overflow: auto;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -54,12 +58,12 @@ body {
   container-type: size;
   display: grid;
   place-items: center;
-  min-height: 0;
+  min-height: calc(var(--face-min) + 12px);
   padding: 12px 12px 0;
 }
 
 .face {
-  --size: min(100cqw, 100cqh);
+  --size: max(var(--face-min), min(100cqw, 100cqh));
   width: var(--size);
   height: var(--size);
   position: relative;
@@ -73,29 +77,30 @@ body {
 .ticks line { stroke: var(--tick); stroke-width: 0.8; stroke-linecap: round; }
 .ticks line.major { stroke: var(--tick-major); stroke-width: 1.6; }
 
-.labels text {
+.labels text, .hour-labels text {
   fill: var(--muted);
-  font-size: 7.5px;
+  font-size: 7px;
   font-variant-numeric: tabular-nums;
   text-anchor: middle;
   dominant-baseline: central;
 }
+.hour-labels text { font-size: 5.4px; font-weight: 600; fill: var(--tick-major); }
 
-.track { fill: none; stroke: var(--track); stroke-width: 9; }
+.track { fill: none; stroke: var(--track); stroke-width: 7; }
 /* Faint full ring while more than an hour remains (the hand is then lapping). */
-.arc-hours { fill: none; stroke: var(--current); stroke-width: 9; opacity: 0; }
+.arc-hours { fill: none; stroke: var(--current); stroke-width: 7; opacity: 0; }
 .face.multi-hour .arc-hours { opacity: 0.28; }
 .arc {
   fill: none;
   stroke: var(--current);
-  stroke-width: 9;
+  stroke-width: 7;
   stroke-dasharray: 0 100;
   transition: stroke 0.6s;
 }
 .porthole { fill: none; stroke: var(--track); stroke-width: 0.8; }
 
 .hand line { stroke-linecap: round; }
-.hand-hour line { stroke: var(--text); stroke-width: 5; opacity: 0.85; }
+.hand-hour line { stroke: var(--text); stroke-width: 4.5; }
 .hand-min line { stroke: var(--text); stroke-width: 2.4; }
 .hand-min circle { fill: var(--text); stroke: var(--face); stroke-width: 1.4; }
 .hand-sec line { stroke: var(--sweep); stroke-width: 0.9; }
@@ -166,6 +171,11 @@ body {
   gap: 10px;
   justify-items: center;
   padding: 12px 12px 16px;
+  /* If the window is smaller than face + controls, the page scrolls; sticky
+     keeps the controls pinned to the bottom edge so they never leave view. */
+  position: sticky;
+  bottom: 0;
+  background: var(--bg);
 }
 
 .row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
@@ -206,7 +216,7 @@ button[aria-pressed="true"] { color: var(--muted); }
 }
 
 /* The controls never hide: on short windows they get tighter and the face
-   shrinks instead (the face's row is minmax(0, 1fr), the controls' row is auto). */
+   shrinks instead, down to --face-min; below that the page scrolls. */
 @media (max-height: 420px) {
   .stage { padding-top: 6px; }
   .controls { gap: 6px; padding: 8px 8px 10px; }

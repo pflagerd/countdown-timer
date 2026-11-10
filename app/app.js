@@ -20,7 +20,7 @@ const HALF_DAY_MS = 12 * HOUR_MS; // little hand: one turn per 12 hours
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'),
+  face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'), hourLabels: $('hourLabels'),
   hourHand: $('hourHand'), minHand: $('minHand'), secHand: $('secHand'),
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'),
@@ -253,10 +253,15 @@ function adjust(deltaMs) {
 
 /* ------------------------------------------------------------------ render */
 
-/** 60 minute ticks plus labels 0, 5 … 55, numbered clockwise like a clock face. */
+/**
+ * 60 minute ticks; minute labels 0, 5 … 55 on the outer ring; small hour
+ * numerals 0 … 11 on an inner ring (0 at the top = "zero hour"), all numbered
+ * clockwise like a clock face.
+ */
 function buildDial() {
   const NS = 'http://www.w3.org/2000/svg';
-  const LABEL_R = 81;
+  const LABEL_R = 83;
+  const HOUR_LABEL_R = 62.5;
   for (let i = 0; i < 60; i++) {
     const major = i % 5 === 0;
     const line = document.createElementNS(NS, 'line');
@@ -272,6 +277,12 @@ function buildDial() {
       text.setAttribute('y', (-Math.cos(a) * LABEL_R).toFixed(2));
       text.textContent = String(i);
       el.labels.appendChild(text);
+
+      const hour = document.createElementNS(NS, 'text');
+      hour.setAttribute('x', (Math.sin(a) * HOUR_LABEL_R).toFixed(2));
+      hour.setAttribute('y', (-Math.cos(a) * HOUR_LABEL_R).toFixed(2));
+      hour.textContent = String(i / 5);
+      el.hourLabels.appendChild(hour);
     }
   }
 }
