@@ -404,14 +404,22 @@ const MIN_LAYOUT_W = 250;   // face-min + side padding, and room for the control
 
 /**
  * Two arrangements: controls below the clock (default) or beside it
- * (`html.wide`). On every resize we lay out both, measure how big the clock
- * face comes out in each, and keep whichever gives the bigger clock; wide,
- * short windows therefore get the side-by-side layout.
+ * (`html.wide`). On every resize we lay out both and measure how big the clock
+ * face comes out in each. The first time, the bigger one wins; after that we
+ * only switch when the other arrangement is more than SWITCH_MARGIN bigger
+ * (hysteresis), so dragging near the cut-over doesn't make it flip-flop.
  */
+const SWITCH_MARGIN = 0.05;
+let currentWide = null;     // null = not decided yet
 function fitToWindow() {
   const stacked = applyLayout(false);
   const wide = applyLayout(true);
-  if (stacked.face >= wide.face) applyLayout(false);
+  let useWide;
+  if (currentWide === null) useWide = wide.face > stacked.face;
+  else if (currentWide) useWide = !(stacked.face > wide.face * (1 + SWITCH_MARGIN));
+  else useWide = wide.face > stacked.face * (1 + SWITCH_MARGIN);
+  currentWide = useWide;
+  if (!useWide) applyLayout(false);   // applyLayout(true) ran last, so only "below" needs re-applying
 }
 
 /** Apply one arrangement, scale it to fit, and report the resulting face size (screen px). */
