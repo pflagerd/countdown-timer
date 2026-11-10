@@ -23,12 +23,12 @@
         <circle class="track" r="67"/>
         <circle class="arc-hours" r="67"/>
         <circle class="arc" id="arc" r="67" pathLength="100" transform="rotate(-90)"/>
-        <circle class="sec-track" r="56"/>
-        <circle class="sec-dot" id="secDot" cy="-56" r="1.6"/>
-        <g class="hand" id="hand">
-          <line y1="-57" y2="-76"/>
-          <circle cy="-67" r="5"/>
-        </g>
+        <circle class="porthole" r="51"/>
+        <!-- Hands start at the edge of the digital readout's "porthole" so they
+             never cover the digits. All three run counter-clockwise to 12. -->
+        <g class="hand hand-hour" id="hourHand"><line y1="-52" y2="-63"/></g>
+        <g class="hand hand-min" id="minHand"><line y1="-52" y2="-87"/><circle cy="-67" r="4.2"/></g>
+        <g class="hand hand-sec" id="secHand"><line y1="-52" y2="-95"/><circle cy="-52" r="1.6"/></g>
       </svg>
       <div class="readout">
         <div class="digits" id="digits">05:00</div>

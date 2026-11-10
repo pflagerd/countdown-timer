@@ -2,7 +2,12 @@
 
 A small, dependency-free countdown timer you can install as a PWA (Progressive Web App). It runs on `localhost` in a chrome-less browser window.
 
-- **Analog face: a 60-minute dial that runs backwards.** Minute ticks are labelled 0–55 clockwise, like a clock face. The hand starts at the mark for the time remaining (a 25-minute timer starts at "25", 5 o'clock) and sweeps **counter-clockwise** to 0. The coloured arc from 12 o'clock to the hand is the time left. Over 60 minutes, the hand laps like a minute hand running backwards (passing 12 once per hour) and a faint full ring shows that more than an hour remains. A small seconds dot also runs counter-clockwise and reaches 12 on each whole minute.
+- **Analog face: an analog clock running backwards to "zero hour".** Minute ticks are labelled 0–55 clockwise, like a clock face. All three hands show time *remaining*, move **counter-clockwise**, and meet at 12 when the countdown reaches zero:
+  - **little hand:** hours remaining, one turn per 12 h. It points at "5" for 1 h, "10" for 2 h, and so on.
+  - **big hand** (the one with the knob): minutes remaining within the hour, one turn per hour. The coloured arc from 12 o'clock to it is the time left in the current hour. A faint full ring means more than an hour remains.
+  - **sweep hand** (thin, coral): seconds remaining within the minute, one turn per minute.
+
+  The hands start at the edge of the central readout instead of at a pivot in the middle, so they never cover the digits.
 - **Digital readout** in the centre of the face (`MM:SS`, or `H:MM:SS` for durations of an hour or more).
 - **Thin progress bar** just below the readout. It is drawn translucent on purpose so it stays in the background.
 - **Status line** showing the wall-clock end time (`ENDS 9:02 PM`), or `PAUSED` / `TIME'S UP`.
@@ -28,7 +33,7 @@ That's all. The script starts the local server (if it isn't already running) and
 ./countdown 25m
 ```
 
-Opens the window, sets 25 minutes and starts the timer immediately. The hand starts at "25" and sweeps counter-clockwise to 0.
+Opens the window, sets 25 minutes and starts the timer immediately. The big hand starts at "25" and moves counter-clockwise to 0.
 
 Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30:00` (h:mm:ss), or a bare number meaning minutes (`10`, `2.5`).
 

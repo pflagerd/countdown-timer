@@ -15,10 +15,13 @@ const MIN_MS = 1000;
 const ALARM_REPEATS = 20;          // chime bursts before the alarm gives up
 const ALARM_INTERVAL_MS = 1500;
 const HOUR_MS = 3600000;        // the dial is a 60-minute face
+const MINUTE_MS = 60000;
+const HALF_DAY_MS = 12 * HOUR_MS; // little hand: one turn per 12 hours
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  face: $('face'), arc: $('arc'), hand: $('hand'), secDot: $('secDot'), ticks: $('ticks'), labels: $('labels'),
+  face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'),
+  hourHand: $('hourHand'), minHand: $('minHand'), secHand: $('secHand'),
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
@@ -282,22 +285,27 @@ function render(now = Date.now()) {
   const frac = state.duration > 0 ? clamp(rem / state.duration, 0, 1) : 0;
   const elapsedFrac = 1 - frac;
 
-  // 60-minute dial, running backwards: the hand sits at the remaining-minutes
-  // mark (25 min → the "25" at 5 o'clock) and sweeps counter-clockwise to 0.
-  // The arc from 12 o'clock clockwise to the hand is the time remaining.
-  // Beyond an hour the hand laps like a minute hand: lap is in (0, 60 min], so
-  // exactly 60:00 / 2:00:00 show a full circle rather than an empty one.
+  // A clock running backwards to "zero hour". Every hand shows time REMAINING
+  // and moves counter-clockwise (its angle shrinks as time passes); all three
+  // meet at 12 when the countdown hits zero, and stay parked there in overtime.
+  //   little hand: hours remaining, one turn per 12 h (points at "5" = 1 h)
+  //   big hand:    minutes remaining within the hour, one turn per hour
+  //   sweep hand:  seconds remaining within the minute, one turn per minute
+  // The arc from 12 o'clock clockwise to the big hand is the time remaining in
+  // the current hour.
   const r = Math.max(rem, 0);
-  const lap = r > 0 ? ((r - 1) % HOUR_MS) + 1 : 0;
-  const dialFrac = lap / HOUR_MS;
-  el.arc.style.strokeDasharray = `${dialFrac * 100} 100`;
-  el.hand.setAttribute('transform', `rotate(${dialFrac * 360})`);
-  el.face.classList.toggle('multi-hour', r > HOUR_MS);
+  const hourAngle = ((r % HALF_DAY_MS) / HALF_DAY_MS) * 360;
+  const minAngle = ((r % HOUR_MS) / HOUR_MS) * 360;
+  const secAngle = ((r % MINUTE_MS) / MINUTE_MS) * 360;
+  el.hourHand.setAttribute('transform', `rotate(${hourAngle})`);
+  el.minHand.setAttribute('transform', `rotate(${minAngle})`);
+  el.secHand.setAttribute('transform', `rotate(${secAngle})`);
 
-  // Seconds dot: also counter-clockwise, reaching 12 o'clock on every whole
-  // minute; in overtime it runs clockwise (time counting up).
-  const secAngle = rem >= 0 ? ((rem % 60000) / 60000) * 360 : ((-rem % 60000) / 60000) * 360;
-  el.secDot.setAttribute('transform', `rotate(${secAngle})`);
+  // Arc uses a lap in (0, 60 min] so exactly 60:00 / 2:00:00 draw a full
+  // circle rather than an empty one; a faint full ring means "> 1 h left".
+  const lap = r > 0 ? ((r - 1) % HOUR_MS) + 1 : 0;
+  el.arc.style.strokeDasharray = `${(lap / HOUR_MS) * 100} 100`;
+  el.face.classList.toggle('multi-hour', r > HOUR_MS);
 
   el.barFill.style.transform = `scaleX(${elapsedFrac})`;
   el.bar.setAttribute('aria-valuenow', String(Math.round(elapsedFrac * 100)));

@@ -9,6 +9,7 @@
   --accent: #4cc2ff;
   --warn: #ffb347;
   --alarm: #ff5d5d;
+  --sweep: #ff8a5c;
   --btn: #1c232d;
   --btn-hover: #263040;
   --current: var(--accent);
@@ -26,6 +27,7 @@
     --accent: #0a84d6;
     --warn: #d9822b;
     --alarm: #d93636;
+    --sweep: #e0562f;
     --btn: #ffffff;
     --btn-hover: #e6ebf0;
   }
@@ -90,11 +92,14 @@ body {
   stroke-dasharray: 0 100;
   transition: stroke 0.6s;
 }
-.sec-track { fill: none; stroke: var(--track); stroke-width: 0.6; }
-.sec-dot { fill: var(--muted); }
+.porthole { fill: none; stroke: var(--track); stroke-width: 0.8; }
 
-.hand line { stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; }
-.hand circle { fill: var(--text); stroke: var(--face); stroke-width: 1.5; }
+.hand line { stroke-linecap: round; }
+.hand-hour line { stroke: var(--text); stroke-width: 5; opacity: 0.85; }
+.hand-min line { stroke: var(--text); stroke-width: 2.4; }
+.hand-min circle { fill: var(--text); stroke: var(--face); stroke-width: 1.4; }
+.hand-sec line { stroke: var(--sweep); stroke-width: 0.9; }
+.hand-sec circle { fill: var(--sweep); }
 
 .readout {
   position: absolute;
