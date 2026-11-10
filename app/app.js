@@ -1,0 +1,489 @@
+'use strict';
+
+/*
+ * Countdown timer — plain JS, no dependencies.
+ *
+ * Timing model: we never "decrement a counter". While running we store the
+ * wall-clock end time (endAt, epoch ms) and derive everything from
+ * endAt - Date.now(). That keeps the display correct even if timers are
+ * throttled, the window is hidden, or the page is reloaded mid-countdown.
+ */
+
+const STORE_KEY = 'countdown-timer/state/v1';
+const MAX_MS = (99 * 3600 + 59 * 60 + 59) * 1000;
+const MIN_MS = 1000;
+const ALARM_REPEATS = 20;          // chime bursts before the alarm gives up
+const ALARM_INTERVAL_MS = 1500;
+const UI_HIDE_MS = 3000;
+
+const $ = (id) => document.getElementById(id);
+const el = {
+  face: $('face'), arc: $('arc'), hand: $('hand'), secDot: $('secDot'), ticks: $('ticks'),
+  digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
+  inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'),
+  startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
+};
+
+/** status: 'idle' | 'running' | 'paused' | 'done' */
+const state = {
+  duration: 5 * 60 * 1000,
+  remaining: 5 * 60 * 1000,   // authoritative when idle / paused
+  endAt: 0,                   // authoritative when running / done
+  status: 'idle',
+  muted: false,
+};
+
+/* ------------------------------------------------------------------ utils */
+
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function remainingAt(now) {
+  return (state.status === 'running' || state.status === 'done')
+    ? state.endAt - now
+    : state.remaining;
+}
+
+/** Countdown shows ceil (05:00 … 00:01), overtime shows floor (+00:00, +00:01 …). */
+function formatClock(ms, forceHours) {
+  const over = ms < 0;
+  const total = over ? Math.floor(-ms / 1000) : Math.ceil(ms / 1000);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const body = (h > 0 || forceHours) ? `${h}:${pad2(m)}:${pad2(s)}` : `${pad2(m)}:${pad2(s)}`;
+  return (over ? '+' : '') + body;
+}
+
+/**
+ * Accepts "25m", "1h30m", "90s", "1h2m3s", "5:00" (m:ss), "1:30:00" (h:mm:ss),
+ * or a bare number meaning minutes ("25", "2.5"). Returns ms or null.
+ */
+function parseDuration(input) {
+  const str = String(input).trim().toLowerCase();
+  let ms = null;
+  if (/^\d+(:\d{1,2}){1,2}$/.test(str)) {
+    const p = str.split(':').map(Number);
+    while (p.length < 3) p.unshift(0);
+    ms = ((p[0] * 60 + p[1]) * 60 + p[2]) * 1000;
+  } else if (/^\d+(\.\d+)?$/.test(str)) {
+    ms = parseFloat(str) * 60000;
+  } else {
+    const m = str.match(/^(?:(\d+(?:\.\d+)?)h)?(?:(\d+(?:\.\d+)?)m)?(?:(\d+(?:\.\d+)?)s)?$/);
+    if (m && (m[1] || m[2] || m[3])) {
+      ms = ((parseFloat(m[1] || 0) * 60 + parseFloat(m[2] || 0)) * 60 + parseFloat(m[3] || 0)) * 1000;
+    }
+  }
+  if (ms === null || !Number.isFinite(ms) || ms < MIN_MS) return null;
+  return Math.min(Math.round(ms), MAX_MS);
+}
+
+const endTimeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/* ------------------------------------------------------------- persistence */
+
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* private mode etc. */ }
+}
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (!s || typeof s !== 'object') return;
+    if (Number.isFinite(s.duration)) state.duration = clamp(s.duration, MIN_MS, MAX_MS);
+    if (Number.isFinite(s.remaining)) state.remaining = clamp(s.remaining, 0, MAX_MS);
+    if (Number.isFinite(s.endAt)) state.endAt = s.endAt;
+    if (['idle', 'running', 'paused', 'done'].includes(s.status)) state.status = s.status;
+    state.muted = !!s.muted;
+    // A timer that expired while the app was closed is shown as finished (overtime),
+    // but we don't blast an alarm for something that ended long ago.
+    if (state.status === 'running' && state.endAt <= Date.now()) state.status = 'done';
+  } catch { /* corrupt storage: start fresh */ }
+}
+
+/* ------------------------------------------------------------------- audio */
+
+let audioCtx = null;
+
+function unlockAudio() {
+  // Browsers only let an AudioContext run after a user gesture, so we create /
+  // resume it from click & key handlers; the alarm later reuses it.
+  try {
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  } catch { /* no Web Audio */ }
+}
+
+function beep(t, freq, dur) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.35, t + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.02);
+}
+
+function chime() {
+  if (state.muted || !audioCtx || audioCtx.state !== 'running') return;
+  const t = audioCtx.currentTime + 0.02;
+  beep(t, 880, 0.16);
+  beep(t + 0.2, 880, 0.16);
+  beep(t + 0.4, 1175, 0.28);
+}
+
+let alarmTimer = 0;
+function startAlarm() {
+  stopAlarm();
+  let n = 0;
+  const ring = () => {
+    chime();
+    if (++n < ALARM_REPEATS) alarmTimer = setTimeout(ring, ALARM_INTERVAL_MS);
+  };
+  ring();
+}
+function stopAlarm() { clearTimeout(alarmTimer); alarmTimer = 0; }
+
+/* --------------------------------------------------------------- wake lock */
+
+let wakeLock = null;
+async function acquireWakeLock() {
+  if (!('wakeLock' in navigator) || wakeLock || document.visibilityState !== 'visible') return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch { /* denied or unsupported: harmless */ }
+}
+function releaseWakeLock() { wakeLock?.release().catch(() => {}); wakeLock = null; }
+
+/* ------------------------------------------------------------ state machine */
+
+let finishTimer = 0;
+
+/** One-shot timeout at endAt. A single (non-chained) timeout is not subject to
+ *  Chrome's "intensive" 1-per-minute throttling of hidden pages. */
+function scheduleFinish() {
+  clearTimeout(finishTimer);
+  if (state.status !== 'running') return;
+  finishTimer = setTimeout(() => {
+    if (state.status === 'running' && state.endAt - Date.now() <= 25) finish(true);
+    else scheduleFinish();
+  }, Math.max(0, state.endAt - Date.now()));
+}
+
+function start() {
+  if (state.status === 'running') return;
+  if (state.status === 'done') { reset(); }
+  if (state.remaining <= 0) state.remaining = state.duration;
+  state.endAt = Date.now() + state.remaining;
+  state.status = 'running';
+  scheduleFinish();
+  acquireWakeLock();
+  changed();
+}
+
+function pause() {
+  if (state.status !== 'running') return;
+  state.remaining = Math.max(0, state.endAt - Date.now());
+  state.status = 'paused';
+  clearTimeout(finishTimer);
+  releaseWakeLock();
+  changed();
+}
+
+function toggle() {
+  if (state.status === 'running') pause();
+  else if (state.status === 'done') reset();
+  else start();
+}
+
+function reset() {
+  clearTimeout(finishTimer);
+  stopAlarm();
+  releaseWakeLock();
+  state.status = 'idle';
+  state.remaining = state.duration;
+  state.endAt = 0;
+  changed();
+}
+
+function finish(withAlarm) {
+  clearTimeout(finishTimer);
+  state.status = 'done';
+  releaseWakeLock();
+  if (withAlarm) startAlarm();
+  changed();
+}
+
+function setDuration(ms) {
+  const d = clamp(ms, MIN_MS, MAX_MS);
+  stopAlarm();
+  clearTimeout(finishTimer);
+  state.duration = d;
+  state.remaining = d;
+  state.endAt = 0;
+  state.status = 'idle';
+  changed();
+}
+
+/** +/- adjustments work in every state; while running they shift the end time. */
+function adjust(deltaMs) {
+  const now = Date.now();
+  if (state.status === 'running') {
+    const rem = state.endAt - now + deltaMs;
+    state.duration = clamp(state.duration + deltaMs, MIN_MS, MAX_MS);
+    if (rem <= 0) { state.endAt = now; finish(true); return; }
+    state.endAt = now + Math.min(rem, MAX_MS);
+    scheduleFinish();
+    changed();
+  } else if (state.status === 'paused') {
+    state.remaining = clamp(state.remaining + deltaMs, MIN_MS, MAX_MS);
+    state.duration = clamp(Math.max(state.duration + deltaMs, state.remaining), MIN_MS, MAX_MS);
+    changed();
+  } else {
+    setDuration(state.duration + deltaMs);
+  }
+}
+
+/* ------------------------------------------------------------------ render */
+
+function buildTicks() {
+  const NS = 'http://www.w3.org/2000/svg';
+  for (let i = 0; i < 60; i++) {
+    const major = i % 5 === 0;
+    const line = document.createElementNS(NS, 'line');
+    line.setAttribute('y1', major ? -87 : -90);
+    line.setAttribute('y2', -94);
+    line.setAttribute('transform', `rotate(${i * 6})`);
+    if (major) line.setAttribute('class', 'major');
+    el.ticks.appendChild(line);
+  }
+}
+
+let lastDigits = '';
+let lastStatus = '';
+let lastTitle = '';
+
+function render(now = Date.now()) {
+  const rem = remainingAt(now);
+  const frac = state.duration > 0 ? clamp(rem / state.duration, 0, 1) : 0;
+  const elapsedFrac = 1 - frac;
+
+  // Remaining arc runs clockwise from the hand back to 12 o'clock.
+  el.arc.style.strokeDasharray = `${frac * 100} 100`;
+  el.arc.style.strokeDashoffset = `${-elapsedFrac * 100}`;
+  el.hand.setAttribute('transform', `rotate(${elapsedFrac * 360})`);
+
+  // Seconds dot sweeps clockwise and reaches 12 o'clock on every whole minute.
+  const secAngle = rem >= 0 ? -((rem % 60000) / 60000) * 360 : ((-rem % 60000) / 60000) * 360;
+  el.secDot.setAttribute('transform', `rotate(${secAngle})`);
+
+  el.barFill.style.transform = `scaleX(${elapsedFrac})`;
+  el.bar.setAttribute('aria-valuenow', String(Math.round(elapsedFrac * 100)));
+
+  const longFmt = state.duration >= 3600000;
+  const digits = formatClock(rem, longFmt);
+  if (digits !== lastDigits) {
+    el.digits.textContent = digits;
+    el.digits.classList.toggle('long', longFmt);
+    lastDigits = digits;
+  }
+
+  let status;
+  switch (state.status) {
+    case 'running': status = `ends ${endTimeFmt.format(state.endAt)}`; break;
+    case 'paused':  status = 'paused'; break;
+    case 'done':    status = "time's up"; break;
+    default:        status = 'ready';
+  }
+  if (status !== lastStatus) { el.status.textContent = status; lastStatus = status; }
+
+  el.face.classList.toggle('warn', (state.status === 'running' || state.status === 'paused') && frac <= 0.1);
+  el.face.classList.toggle('done', state.status === 'done');
+  el.face.classList.toggle('paused', state.status === 'paused');
+
+  const title = state.status === 'idle' ? 'Countdown'
+    : state.status === 'done' ? `⏰ ${digits} · Countdown`
+    : `${digits} · Countdown`;
+  if (title !== lastTitle) { document.title = title; lastTitle = title; }
+}
+
+let rafId = 0;
+function loop() {
+  render();
+  rafId = (state.status === 'running' || state.status === 'done') ? requestAnimationFrame(loop) : 0;
+}
+function ensureLoop() { if (!rafId) loop(); }
+
+/** Called after every state transition. */
+function changed() {
+  save();
+  syncControls();
+  ensureLoop();
+  render();
+  pokeUI();
+}
+
+/* ---------------------------------------------------------------- controls */
+
+function syncControls() {
+  const running = state.status === 'running';
+  el.startBtn.textContent = running ? 'Pause' : state.status === 'paused' ? 'Resume'
+    : state.status === 'done' ? 'Dismiss' : 'Start';
+  for (const inp of [el.inH, el.inM, el.inS]) inp.disabled = running;
+  el.presets.setAttribute('aria-disabled', String(running));
+  el.muteBtn.textContent = state.muted ? 'Muted' : 'Sound on';
+  el.muteBtn.setAttribute('aria-pressed', String(state.muted));
+  if (document.activeElement && ![el.inH, el.inM, el.inS].includes(document.activeElement)) {
+    writeInputs(state.duration);
+  }
+}
+
+function writeInputs(ms) {
+  const t = Math.round(ms / 1000);
+  el.inH.value = pad2(Math.floor(t / 3600));
+  el.inM.value = pad2(Math.floor((t % 3600) / 60));
+  el.inS.value = pad2(t % 60);
+}
+
+function readInputs() {
+  const n = (inp) => parseInt(inp.value.replace(/\D/g, ''), 10) || 0;
+  return ((n(el.inH) * 60 + n(el.inM)) * 60 + n(el.inS)) * 1000;
+}
+
+let uiTimer = 0;
+function pokeUI() {
+  document.body.classList.remove('ui-hidden');
+  clearTimeout(uiTimer);
+  if (state.status === 'running') {
+    uiTimer = setTimeout(() => {
+      if (state.status === 'running') document.body.classList.add('ui-hidden');
+    }, UI_HIDE_MS);
+  }
+}
+
+function toggleFullscreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else document.documentElement.requestFullscreen().catch(() => {});
+}
+
+function toggleMute() {
+  state.muted = !state.muted;
+  if (state.muted) stopAlarm();
+  changed();
+}
+
+function bindEvents() {
+  // Any interaction unlocks audio (needed when started via ?autostart=1).
+  for (const type of ['pointerdown', 'keydown']) {
+    addEventListener(type, unlockAudio, { capture: true });
+    addEventListener(type, pokeUI, { capture: true, passive: true });
+  }
+  addEventListener('pointermove', pokeUI, { passive: true });
+
+  // Mouse clicks shouldn't leave focus on a button (Space would re-trigger it).
+  for (const btn of document.querySelectorAll('.controls button')) {
+    btn.addEventListener('pointerup', () => btn.blur());
+  }
+
+  el.face.addEventListener('click', toggle);
+  el.startBtn.addEventListener('click', toggle);
+  el.resetBtn.addEventListener('click', reset);
+  el.muteBtn.addEventListener('click', toggleMute);
+  el.fsBtn.addEventListener('click', toggleFullscreen);
+
+  el.presets.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-min]');
+    if (b) setDuration(Number(b.dataset.min) * 60000);
+  });
+
+  for (const inp of [el.inH, el.inM, el.inS]) {
+    inp.addEventListener('focus', () => inp.select());
+    inp.addEventListener('input', () => {
+      inp.value = inp.value.replace(/\D/g, '').slice(0, 2);
+      const ms = readInputs();
+      if (ms >= MIN_MS) setDuration(ms);
+    });
+    inp.addEventListener('blur', () => writeInputs(state.duration));
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { inp.blur(); start(); e.preventDefault(); }
+      if (e.key === 'Escape') inp.blur();
+    });
+  }
+
+  addEventListener('keydown', (e) => {
+    if (e.target instanceof HTMLInputElement || e.ctrlKey || e.altKey || e.metaKey) return;
+    const big = e.shiftKey ? 10 : 1;
+    switch (e.key) {
+      case ' ':
+        toggle(); break; // Space is always start/pause, even if a button has focus
+      case 'Enter':
+        if (e.target instanceof HTMLButtonElement) return; // keyboard users: Enter activates the button
+        toggle(); break;
+      case 'r': case 'R': case 'Escape': reset(); break;
+      case 'm': case 'M': toggleMute(); break;
+      case 'f': case 'F': toggleFullscreen(); break;
+      case '+': case '=': case 'ArrowUp':   adjust(60000 * big); break;
+      case '-': case '_': case 'ArrowDown': adjust(-60000 * big); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      if (state.status === 'running') acquireWakeLock();
+      render();
+    }
+  });
+
+  // Keep the window/taskbar title roughly current even when rAF is paused.
+  setInterval(() => { if (state.status !== 'idle') render(); }, 1000);
+
+  // Another window of this app changed state → follow it.
+  addEventListener('storage', (e) => {
+    if (e.key !== STORE_KEY) return;
+    load();
+    scheduleFinish();
+    syncControls();
+    ensureLoop();
+    render();
+  });
+}
+
+/* -------------------------------------------------------------------- boot */
+
+function applyUrlParams() {
+  const params = new URLSearchParams(location.search);
+  const t = params.get('t');
+  if (t === null) return;
+  const ms = parseDuration(t);
+  if (ms !== null) {
+    setDuration(ms);
+    if (['1', 'true', 'yes', ''].includes(params.get('autostart') ?? 'no')) start();
+  }
+  // Strip the params so a reload doesn't restart the timer.
+  history.replaceState(null, '', location.pathname);
+}
+
+function boot() {
+  buildTicks();
+  load();
+  bindEvents();
+  applyUrlParams();
+  if (state.status === 'running') { scheduleFinish(); acquireWakeLock(); }
+  writeInputs(state.duration);
+  syncControls();
+  ensureLoop();
+  render();
+  pokeUI();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+  }
+}
+
+boot();

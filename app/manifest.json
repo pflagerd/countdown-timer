@@ -1,0 +1,21 @@
+{
+  "name": "Countdown Timer",
+  "short_name": "Countdown",
+  "description": "A chrome-less countdown timer with an analog face and digital readout.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "5 minutes",  "url": "./?t=5m&autostart=1" },
+    { "name": "25 minutes", "url": "./?t=25m&autostart=1" }
+  ]
+}

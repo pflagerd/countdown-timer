@@ -1,0 +1,201 @@
+:root {
+  --bg: #0e1116;
+  --face: #151a21;
+  --track: #232b37;
+  --tick: #3a4452;
+  --tick-major: #6b7686;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #4cc2ff;
+  --warn: #ffb347;
+  --alarm: #ff5d5d;
+  --btn: #1c232d;
+  --btn-hover: #263040;
+  --current: var(--accent);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #eef1f4;
+    --face: #ffffff;
+    --track: #e2e7ed;
+    --tick: #c3cad3;
+    --tick-major: #7d8794;
+    --text: #1b2028;
+    --muted: #66707c;
+    --accent: #0a84d6;
+    --warn: #d9822b;
+    --alarm: #d93636;
+    --btn: #ffffff;
+    --btn-hover: #e6ebf0;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ---------- clock face ---------- */
+
+.stage {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  padding: 12px 12px 0;
+}
+
+.face {
+  --size: min(100cqw, 100cqh);
+  width: var(--size);
+  height: var(--size);
+  position: relative;
+  container-type: size;
+  cursor: pointer;
+}
+
+.face svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.disc { fill: var(--face); }
+.ticks line { stroke: var(--tick); stroke-width: 0.8; stroke-linecap: round; }
+.ticks line.major { stroke: var(--tick-major); stroke-width: 1.6; }
+
+.track { fill: none; stroke: var(--track); stroke-width: 8; }
+.arc {
+  fill: none;
+  stroke: var(--current);
+  stroke-width: 8;
+  stroke-dasharray: 100 100;
+  stroke-dashoffset: 0;
+  transition: stroke 0.6s;
+}
+.sec-track { fill: none; stroke: var(--track); stroke-width: 0.6; }
+.sec-dot { fill: var(--muted); }
+
+.hand line { stroke: var(--text); stroke-width: 1.8; stroke-linecap: round; }
+.hand circle { fill: var(--text); stroke: var(--face); stroke-width: 1.5; }
+
+.readout {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.digits {
+  font-size: 16cqmin;
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: var(--text);
+}
+.digits.long { font-size: 11cqmin; }
+
+/* Deliberately understated: thin, translucent track + translucent fill. */
+.bar {
+  width: 40cqmin;
+  height: max(2px, 0.9cqmin);
+  margin-top: 3.2cqmin;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.bar > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--current);
+  opacity: 0.55;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.status {
+  margin-top: 2.6cqmin;
+  font-size: 3.6cqmin;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  min-height: 1.2em;
+}
+
+.face.warn { --current: var(--warn); }
+.face.done { --current: var(--alarm); }
+.face.done .digits { color: var(--alarm); }
+.face.done .track { animation: pulse 1s ease-in-out infinite; }
+.face.paused .digits { opacity: 0.55; }
+
+@keyframes pulse {
+  0%, 100% { stroke: var(--track); }
+  50% { stroke: color-mix(in srgb, var(--alarm) 45%, var(--track)); }
+}
+
+/* ---------- controls ---------- */
+
+.controls {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 12px 12px 16px;
+  transition: opacity 0.4s;
+}
+
+.row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
+
+button, .setter input {
+  font: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--btn);
+  border: 1px solid var(--track);
+  border-radius: 8px;
+}
+
+button { padding: 6px 12px; cursor: pointer; }
+button:hover { background: var(--btn-hover); }
+button:focus-visible, .setter input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; min-width: 84px; }
+button.primary:hover { filter: brightness(1.1); }
+button[aria-pressed="true"] { color: var(--muted); }
+
+.setter input {
+  width: 3ch;
+  padding: 4px 0;
+  text-align: center;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  box-sizing: content-box;
+}
+.setter input:disabled { opacity: 0.45; }
+.colon { color: var(--muted); font-size: 18px; }
+
+.presets button { padding: 4px 9px; font-size: 13px; }
+.presets[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
+
+/* While running, controls fade out after a few idle seconds. */
+body.ui-hidden .controls { opacity: 0; pointer-events: none; }
+body.ui-hidden { cursor: none; }
+body.ui-hidden .face { cursor: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .face.done .track { animation: none; stroke: color-mix(in srgb, var(--alarm) 45%, var(--track)); }
+  .controls, .arc { transition: none; }
+}
+
+@media (max-height: 420px) {
+  .presets { display: none; }
+}
