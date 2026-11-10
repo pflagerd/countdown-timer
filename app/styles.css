@@ -71,13 +71,23 @@ body {
 .ticks line { stroke: var(--tick); stroke-width: 0.8; stroke-linecap: round; }
 .ticks line.major { stroke: var(--tick-major); stroke-width: 1.6; }
 
-.track { fill: none; stroke: var(--track); stroke-width: 8; }
+.labels text {
+  fill: var(--muted);
+  font-size: 7.5px;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.track { fill: none; stroke: var(--track); stroke-width: 9; }
+/* Faint full ring while more than an hour remains (the hand is then lapping). */
+.arc-hours { fill: none; stroke: var(--current); stroke-width: 9; opacity: 0; }
+.face.multi-hour .arc-hours { opacity: 0.28; }
 .arc {
   fill: none;
   stroke: var(--current);
-  stroke-width: 8;
-  stroke-dasharray: 100 100;
-  stroke-dashoffset: 0;
+  stroke-width: 9;
+  stroke-dasharray: 0 100;
   transition: stroke 0.6s;
 }
 .sec-track { fill: none; stroke: var(--track); stroke-width: 0.6; }
@@ -96,20 +106,20 @@ body {
 }
 
 .digits {
-  font-size: 16cqmin;
+  font-size: 14cqmin;
   font-weight: 300;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   line-height: 1;
   color: var(--text);
 }
-.digits.long { font-size: 11cqmin; }
+.digits.long { font-size: 10cqmin; }
 
 /* Deliberately understated: thin, translucent track + translucent fill. */
 .bar {
-  width: 40cqmin;
-  height: max(2px, 0.9cqmin);
-  margin-top: 3.2cqmin;
+  width: 32cqmin;
+  height: max(2px, 0.8cqmin);
+  margin-top: 2.8cqmin;
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--text) 10%, transparent);
@@ -125,8 +135,8 @@ body {
 }
 
 .status {
-  margin-top: 2.6cqmin;
-  font-size: 3.6cqmin;
+  margin-top: 2.2cqmin;
+  font-size: 3.2cqmin;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
@@ -151,7 +161,6 @@ body {
   gap: 10px;
   justify-items: center;
   padding: 12px 12px 16px;
-  transition: opacity 0.4s;
 }
 
 .row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
@@ -180,22 +189,24 @@ button[aria-pressed="true"] { color: var(--muted); }
   font-variant-numeric: tabular-nums;
   box-sizing: content-box;
 }
-.setter input:disabled { opacity: 0.45; }
+.setter input:disabled { opacity: 0.7; }
 .colon { color: var(--muted); font-size: 18px; }
 
 .presets button { padding: 4px 9px; font-size: 13px; }
-.presets[aria-disabled="true"] { opacity: 0.45; pointer-events: none; }
-
-/* While running, controls fade out after a few idle seconds. */
-body.ui-hidden .controls { opacity: 0; pointer-events: none; }
-body.ui-hidden { cursor: none; }
-body.ui-hidden .face { cursor: none; }
+.presets[aria-disabled="true"] { opacity: 0.7; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .face.done .track { animation: none; stroke: color-mix(in srgb, var(--alarm) 45%, var(--track)); }
-  .controls, .arc { transition: none; }
+  .arc { transition: none; }
 }
 
+/* The controls never hide: on short windows they get tighter and the face
+   shrinks instead (the face's row is minmax(0, 1fr), the controls' row is auto). */
 @media (max-height: 420px) {
-  .presets { display: none; }
+  .stage { padding-top: 6px; }
+  .controls { gap: 6px; padding: 8px 8px 10px; }
+  button { padding: 3px 9px; font-size: 13px; }
+  .presets button { padding: 2px 7px; font-size: 12px; }
+  .setter input, .colon { font-size: 15px; }
+  .setter input { padding: 2px 0; }
 }

@@ -2,7 +2,7 @@
 
 A small, dependency-free countdown timer you can install as a PWA (Progressive Web App). It runs on `localhost` in a chrome-less browser window.
 
-- **Analog face:** 60 tick marks and a coloured "remaining" arc that empties clockwise as time passes. A hand with a knob marks the leading edge, and a small seconds dot sweeps once per minute.
+- **Analog face: a 60-minute dial that runs backwards.** Minute ticks are labelled 0–55 clockwise, like a clock face. The hand starts at the mark for the time remaining (a 25-minute timer starts at "25", 5 o'clock) and sweeps **counter-clockwise** to 0. The coloured arc from 12 o'clock to the hand is the time left. Over 60 minutes, the hand laps like a minute hand running backwards (passing 12 once per hour) and a faint full ring shows that more than an hour remains. A small seconds dot also runs counter-clockwise and reaches 12 on each whole minute.
 - **Digital readout** in the centre of the face (`MM:SS`, or `H:MM:SS` for durations of an hour or more).
 - **Thin progress bar** just below the readout. It is drawn translucent on purpose so it stays in the background.
 - **Status line** showing the wall-clock end time (`ENDS 9:02 PM`), or `PAUSED` / `TIME'S UP`.
@@ -11,7 +11,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **State survives a reload** or closing the window, because the timer stores an end *timestamp* in `localStorage`.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
-- **Controls fade out** (and the cursor hides) after 3 s without input while the timer runs.
+- **Controls always visible.** The controls at the bottom never fade or hide. When the window gets smaller, the clock face shrinks and the controls get more compact, so they are never cut off.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
 No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.
@@ -28,7 +28,7 @@ That's all. The script starts the local server (if it isn't already running) and
 ./countdown 25m
 ```
 
-Opens the window, sets 25 minutes and starts the timer immediately.
+Opens the window, sets 25 minutes and starts the timer immediately. The hand starts at "25" and sweeps counter-clockwise to 0.
 
 Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30:00` (h:mm:ss), or a bare number meaning minutes (`10`, `2.5`).
 

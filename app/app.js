@@ -14,11 +14,11 @@ const MAX_MS = (99 * 3600 + 59 * 60 + 59) * 1000;
 const MIN_MS = 1000;
 const ALARM_REPEATS = 20;          // chime bursts before the alarm gives up
 const ALARM_INTERVAL_MS = 1500;
-const UI_HIDE_MS = 3000;
+const HOUR_MS = 3600000;        // the dial is a 60-minute face
 
 const $ = (id) => document.getElementById(id);
 const el = {
-  face: $('face'), arc: $('arc'), hand: $('hand'), secDot: $('secDot'), ticks: $('ticks'),
+  face: $('face'), arc: $('arc'), hand: $('hand'), secDot: $('secDot'), ticks: $('ticks'), labels: $('labels'),
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
@@ -250,16 +250,26 @@ function adjust(deltaMs) {
 
 /* ------------------------------------------------------------------ render */
 
-function buildTicks() {
+/** 60 minute ticks plus labels 0, 5 … 55, numbered clockwise like a clock face. */
+function buildDial() {
   const NS = 'http://www.w3.org/2000/svg';
+  const LABEL_R = 81;
   for (let i = 0; i < 60; i++) {
     const major = i % 5 === 0;
     const line = document.createElementNS(NS, 'line');
-    line.setAttribute('y1', major ? -87 : -90);
-    line.setAttribute('y2', -94);
+    line.setAttribute('y1', major ? -89 : -92);
+    line.setAttribute('y2', -96);
     line.setAttribute('transform', `rotate(${i * 6})`);
     if (major) line.setAttribute('class', 'major');
     el.ticks.appendChild(line);
+    if (major) {
+      const a = (i * 6 * Math.PI) / 180;
+      const text = document.createElementNS(NS, 'text');
+      text.setAttribute('x', (Math.sin(a) * LABEL_R).toFixed(2));
+      text.setAttribute('y', (-Math.cos(a) * LABEL_R).toFixed(2));
+      text.textContent = String(i);
+      el.labels.appendChild(text);
+    }
   }
 }
 
@@ -272,13 +282,21 @@ function render(now = Date.now()) {
   const frac = state.duration > 0 ? clamp(rem / state.duration, 0, 1) : 0;
   const elapsedFrac = 1 - frac;
 
-  // Remaining arc runs clockwise from the hand back to 12 o'clock.
-  el.arc.style.strokeDasharray = `${frac * 100} 100`;
-  el.arc.style.strokeDashoffset = `${-elapsedFrac * 100}`;
-  el.hand.setAttribute('transform', `rotate(${elapsedFrac * 360})`);
+  // 60-minute dial, running backwards: the hand sits at the remaining-minutes
+  // mark (25 min → the "25" at 5 o'clock) and sweeps counter-clockwise to 0.
+  // The arc from 12 o'clock clockwise to the hand is the time remaining.
+  // Beyond an hour the hand laps like a minute hand: lap is in (0, 60 min], so
+  // exactly 60:00 / 2:00:00 show a full circle rather than an empty one.
+  const r = Math.max(rem, 0);
+  const lap = r > 0 ? ((r - 1) % HOUR_MS) + 1 : 0;
+  const dialFrac = lap / HOUR_MS;
+  el.arc.style.strokeDasharray = `${dialFrac * 100} 100`;
+  el.hand.setAttribute('transform', `rotate(${dialFrac * 360})`);
+  el.face.classList.toggle('multi-hour', r > HOUR_MS);
 
-  // Seconds dot sweeps clockwise and reaches 12 o'clock on every whole minute.
-  const secAngle = rem >= 0 ? -((rem % 60000) / 60000) * 360 : ((-rem % 60000) / 60000) * 360;
+  // Seconds dot: also counter-clockwise, reaching 12 o'clock on every whole
+  // minute; in overtime it runs clockwise (time counting up).
+  const secAngle = rem >= 0 ? ((rem % 60000) / 60000) * 360 : ((-rem % 60000) / 60000) * 360;
   el.secDot.setAttribute('transform', `rotate(${secAngle})`);
 
   el.barFill.style.transform = `scaleX(${elapsedFrac})`;
@@ -324,7 +342,6 @@ function changed() {
   syncControls();
   ensureLoop();
   render();
-  pokeUI();
 }
 
 /* ---------------------------------------------------------------- controls */
@@ -354,17 +371,6 @@ function readInputs() {
   return ((n(el.inH) * 60 + n(el.inM)) * 60 + n(el.inS)) * 1000;
 }
 
-let uiTimer = 0;
-function pokeUI() {
-  document.body.classList.remove('ui-hidden');
-  clearTimeout(uiTimer);
-  if (state.status === 'running') {
-    uiTimer = setTimeout(() => {
-      if (state.status === 'running') document.body.classList.add('ui-hidden');
-    }, UI_HIDE_MS);
-  }
-}
-
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   else document.documentElement.requestFullscreen().catch(() => {});
@@ -380,9 +386,7 @@ function bindEvents() {
   // Any interaction unlocks audio (needed when started via ?autostart=1).
   for (const type of ['pointerdown', 'keydown']) {
     addEventListener(type, unlockAudio, { capture: true });
-    addEventListener(type, pokeUI, { capture: true, passive: true });
   }
-  addEventListener('pointermove', pokeUI, { passive: true });
 
   // Mouse clicks shouldn't leave focus on a button (Space would re-trigger it).
   for (const btn of document.querySelectorAll('.controls button')) {
@@ -470,7 +474,7 @@ function applyUrlParams() {
 }
 
 function boot() {
-  buildTicks();
+  buildDial();
   load();
   bindEvents();
   applyUrlParams();
@@ -479,7 +483,6 @@ function boot() {
   syncControls();
   ensureLoop();
   render();
-  pokeUI();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
