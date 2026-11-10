@@ -90,7 +90,7 @@ Because the service worker is network-first with a cache fallback, the installed
 | ±1 minute (works while running too) | | `↑` `↓` or `+` `-` |
 | ±10 minutes | | `Shift`+`↑` / `Shift`+`↓` |
 | Set an exact time | type into the `hh : mm : ss` fields, then `Enter` to start | |
-| Presets | 1m 5m 10m 15m 25m 45m 1h | |
+| Presets | 1m 5m 10m 15m 25m 45m 1h. In small windows (height ≤ 520 px or width ≤ 380 px) the buttons fold into a **Preset…** dropdown next to the time fields. | |
 | Mute | **Sound on/Muted** | `M` |
 | Fullscreen | **Fullscreen** | `F` |
 

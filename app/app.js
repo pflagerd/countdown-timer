@@ -23,7 +23,7 @@ const el = {
   face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'), hourLabels: $('hourLabels'),
   hourHand: $('hourHand'), minHand: $('minHand'), secHand: $('secHand'),
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
-  inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'),
+  inH: $('inH'), inM: $('inM'), inS: $('inS'), presets: $('presets'), presetSelect: $('presetSelect'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
 };
 
@@ -371,6 +371,7 @@ function syncControls() {
     : state.status === 'done' ? 'Dismiss' : 'Start';
   for (const inp of [el.inH, el.inM, el.inS]) inp.disabled = running;
   el.presets.setAttribute('aria-disabled', String(running));
+  el.presetSelect.disabled = running;
   el.muteBtn.textContent = state.muted ? 'Muted' : 'Sound on';
   el.muteBtn.setAttribute('aria-pressed', String(state.muted));
   if (document.activeElement && ![el.inH, el.inM, el.inS].includes(document.activeElement)) {
@@ -421,6 +422,18 @@ function bindEvents() {
   el.presets.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-min]');
     if (b) setDuration(Number(b.dataset.min) * 60000);
+  });
+
+  // Dropdown version of the presets (shown instead of the buttons in small
+  // windows). Options mirror the buttons so there is one list to maintain.
+  for (const b of el.presets.querySelectorAll('button[data-min]')) {
+    el.presetSelect.add(new Option(b.textContent, b.dataset.min));
+  }
+  el.presetSelect.addEventListener('change', () => {
+    const min = Number(el.presetSelect.value);
+    el.presetSelect.value = '';          // back to "Preset…" so the same choice works again
+    el.presetSelect.blur();              // so Space goes back to start/pause
+    if (min > 0) setDuration(min * 60000);
   });
 
   for (const inp of [el.inH, el.inM, el.inS]) {

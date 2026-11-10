@@ -180,7 +180,7 @@ body {
 
 .row { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; align-items: center; }
 
-button, .setter input {
+button, .setter input, .preset-select {
   font: inherit;
   font-size: 14px;
   color: var(--text);
@@ -208,6 +208,15 @@ button[aria-pressed="true"] { color: var(--muted); }
 .colon { color: var(--muted); font-size: 18px; }
 
 .presets button { padding: 4px 9px; font-size: 13px; }
+
+.preset-select {
+  display: none;            /* only shown in small windows, see below */
+  margin-left: 6px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.preset-select:disabled { opacity: 0.7; cursor: default; }
+.preset-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .presets[aria-disabled="true"] { opacity: 0.7; pointer-events: none; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -217,6 +226,12 @@ button[aria-pressed="true"] { color: var(--muted); }
 
 /* The controls never hide: on short windows they get tighter and the face
    shrinks instead, down to --face-min; below that the page scrolls. */
+/* Small windows: fold the row of preset buttons into the dropdown. */
+@media (max-height: 520px), (max-width: 380px) {
+  .presets { display: none; }
+  .preset-select { display: inline-block; }
+}
+
 @media (max-height: 420px) {
   .stage { padding-top: 6px; }
   .controls { gap: 6px; padding: 8px 8px 10px; }

@@ -47,6 +47,11 @@
       <input id="inM" inputmode="numeric" maxlength="2" aria-label="Minutes" value="05">
       <span class="colon">:</span>
       <input id="inS" inputmode="numeric" maxlength="2" aria-label="Seconds" value="00">
+      <!-- Compact stand-in for the preset buttons in small windows (options are
+           built from the buttons below by app.js). -->
+      <select id="presetSelect" class="preset-select" aria-label="Preset duration">
+        <option value="">Preset…</option>
+      </select>
     </div>
     <div class="row presets" id="presets">
       <button data-min="1">1m</button>
