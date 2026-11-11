@@ -14,7 +14,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Colours:** the face turns amber in the last 10 % and red when time runs out. After that it counts overtime (`+00:04`).
 - **Chime:** made with Web Audio, so there are no audio files. You can mute it.
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
-- **State survives a reload** or closing the window, because the timer stores an end *timestamp* in `localStorage`.
+- **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
 - **Controls always visible.** The controls at the bottom never fade or hide. The action buttons are icons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. When the window gets smaller, the clock face shrinks and the controls get more compact.
 - **Controls below or beside the clock, whichever gives the bigger clock.** On every resize the app tries both arrangements and keeps the one with the larger face. Once an arrangement is in use, it only switches when the other one would be more than 5 % bigger (`SWITCH_MARGIN` in `app.js`), so dragging the window edge near the cut-over doesn't make the layout flip back and forth. Tall and square windows put the controls below. Wide windows (e.g. 640×300, 1280×720, fullscreen on a 16:9 screen) put them in a column to the right, and the clock and controls stay together, centred in the window.
@@ -117,7 +117,7 @@ app/
 - **Alarm timer:** the alarm is one `setTimeout` scheduled for `endAt`. Chrome's ["intensive" throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88) (one wake-up per minute for hidden pages) applies only to *chained* timers, so a single timeout isn't affected. The visual updates use `requestAnimationFrame`, which pauses while the window is hidden, and resume immediately when it's shown again.
 - **Sound needs a user gesture:** Chrome only lets audio play after a user gesture or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them). Any click or key press in the window unlocks audio. If you start the timer with `./countdown 25m` in a *non-installed* window and never touch the window, the chime may stay silent; the red visual alarm still appears. The installed PWA shouldn't have this problem.
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
-- **Multiple windows:** windows of this app stay in sync through the `storage` event.
+- **Multiple windows:** each window is an independent timer. They share only the remembered duration and mute setting, as of the moment a window opens.
 - **Regenerating icons:** the PNG icons were rendered from the SVGs in `app/icons/` with headless Chromium. If you change the SVGs, re-render them (e.g. `rsvg-convert -w 512 icon.svg > icon-512.png` from `librsvg2-bin`) and bump `VERSION` in `sw.js`.
 
 ## License

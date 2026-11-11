@@ -7,9 +7,17 @@
  * wall-clock end time (endAt, epoch ms) and derive everything from
  * endAt - Date.now(). That keeps the display correct even if timers are
  * throttled, the window is hidden, or the page is reloaded mid-countdown.
+ *
+ * Persistence is split (issue #8):
+ *   - preferences (last duration, mute) → localStorage: survive closing the app;
+ *   - the running timer (status, remaining, endAt) → sessionStorage: survives a
+ *     reload of this window but is discarded when the window is closed, so
+ *     closing the app stops the timer and the next launch starts at READY.
  */
 
-const STORE_KEY = 'countdown-timer/state/v1';
+const PREFS_KEY = 'countdown-timer/prefs/v1';     // localStorage
+const SESSION_KEY = 'countdown-timer/session/v1'; // sessionStorage
+const LEGACY_KEY = 'countdown-timer/state/v1';    // pre-#8 localStorage blob (migrated, then removed)
 const MAX_MS = (99 * 3600 + 59 * 60 + 59) * 1000;
 const MIN_MS = 1000;
 const ALARM_REPEATS = 20;          // chime bursts before the alarm gives up
@@ -85,23 +93,50 @@ const endTimeFmt = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute:
 
 /* ------------------------------------------------------------- persistence */
 
+function readJSON(storage, key) {
+  try {
+    const v = JSON.parse(storage.getItem(key) || 'null');
+    return v && typeof v === 'object' ? v : null;
+  } catch { return null; }   // unavailable (private mode etc.) or corrupt: ignore
+}
+
+function writeJSON(storage, key, value) {
+  try { storage.setItem(key, JSON.stringify(value)); } catch { /* unavailable: ignore */ }
+}
+
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch { /* private mode etc. */ }
+  writeJSON(localStorage, PREFS_KEY, { duration: state.duration, muted: state.muted });
+  writeJSON(sessionStorage, SESSION_KEY, {
+    duration: state.duration, status: state.status, remaining: state.remaining, endAt: state.endAt,
+  });
 }
 
 function load() {
-  try {
-    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-    if (!s || typeof s !== 'object') return;
-    if (Number.isFinite(s.duration)) state.duration = clamp(s.duration, MIN_MS, MAX_MS);
-    if (Number.isFinite(s.remaining)) state.remaining = clamp(s.remaining, 0, MAX_MS);
-    if (Number.isFinite(s.endAt)) state.endAt = s.endAt;
-    if (['idle', 'running', 'paused', 'done'].includes(s.status)) state.status = s.status;
-    state.muted = !!s.muted;
-    // A timer that expired while the app was closed is shown as finished (overtime),
-    // but we don't blast an alarm for something that ended long ago.
-    if (state.status === 'running' && state.endAt <= Date.now()) state.status = 'done';
-  } catch { /* corrupt storage: start fresh */ }
+  // 1. Preferences. Older versions kept everything in one localStorage blob;
+  //    take only the duration and mute setting from it, never the running state.
+  let prefs = readJSON(localStorage, PREFS_KEY);
+  if (!prefs) {
+    prefs = readJSON(localStorage, LEGACY_KEY);
+    if (prefs) writeJSON(localStorage, PREFS_KEY, { duration: prefs.duration, muted: prefs.muted });
+  }
+  try { localStorage.removeItem(LEGACY_KEY); } catch { /* ignore */ }
+  if (prefs) {
+    if (Number.isFinite(prefs.duration)) state.duration = clamp(prefs.duration, MIN_MS, MAX_MS);
+    state.muted = !!prefs.muted;
+  }
+  state.status = 'idle';
+  state.remaining = state.duration;
+  state.endAt = 0;
+
+  // 2. Running timer: only present if this same window was reloaded.
+  const s = readJSON(sessionStorage, SESSION_KEY);
+  if (!s || !['idle', 'running', 'paused', 'done'].includes(s.status)) return;
+  if (Number.isFinite(s.duration)) state.duration = clamp(s.duration, MIN_MS, MAX_MS);
+  if (Number.isFinite(s.remaining)) state.remaining = clamp(s.remaining, 0, MAX_MS);
+  if (Number.isFinite(s.endAt)) state.endAt = s.endAt;
+  state.status = s.status;
+  // Expired during the reload itself: show as finished, without re-sounding the alarm.
+  if (state.status === 'running' && state.endAt <= Date.now()) state.status = 'done';
 }
 
 /* ------------------------------------------------------------------- audio */
@@ -546,16 +581,6 @@ function bindEvents() {
 
   // Keep the window/taskbar title roughly current even when rAF is paused.
   setInterval(() => { if (state.status !== 'idle') render(); }, 1000);
-
-  // Another window of this app changed state → follow it.
-  addEventListener('storage', (e) => {
-    if (e.key !== STORE_KEY) return;
-    load();
-    scheduleFinish();
-    syncControls();
-    ensureLoop();
-    render();
-  });
 }
 
 /* -------------------------------------------------------------------- boot */
