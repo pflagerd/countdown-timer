@@ -17,6 +17,19 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
 - **Controls always visible.** The controls at the bottom never fade or hide. The action buttons are icons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. When the window gets smaller, the clock face shrinks and the controls get more compact.
+- **Locked down like a kiosk.** The page cancels:
+  - the right-click menu, and dragging;
+  - browser keyboard shortcuts such as `Ctrl+S`, `Ctrl+P`, `F5`/`Ctrl+R`, `Ctrl`+`+`/`-`/`0` (zoom), `Ctrl+F` and `F12`.
+
+  Still allowed, so the app stays usable from the keyboard:
+  - its own shortcuts;
+  - plain typing in the time fields and the preset dropdown;
+  - `Tab`/`Shift+Tab` to move between controls;
+  - `Enter` on a focused button.
+
+  Limits:
+  - Shortcuts handled by the window manager or the browser itself before the page sees them can't be blocked by a web page. That includes `Alt+F4`, and possibly `Ctrl+W`, `Ctrl+N` and `Ctrl+T`.
+  - `Ctrl+A`/`C`/`V` don't work in the time fields either.
 - **Controls below or beside the clock, whichever gives the bigger clock.** On every resize the app tries both arrangements and keeps the one with the larger face. Once an arrangement is in use, it only switches when the other one would be more than 5 % bigger (`SWITCH_MARGIN` in `app.js`), so dragging the window edge near the cut-over doesn't make the layout flip back and forth. Tall and square windows put the controls below. Wide windows (e.g. 640×300, 1280×720, fullscreen on a 16:9 screen) put them in a column to the right, and the clock and controls stay together, centred in the window.
 - **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than face + controls, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the face and controls stay fully visible at any window size, just smaller.
 - **Themes:** dark and light, following `prefers-color-scheme`.

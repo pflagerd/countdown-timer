@@ -503,6 +503,33 @@ function toggleMute() {
   changed();
 }
 
+/**
+ * Kiosk-style lock-down: no right-click menu, no dragging, and no browser
+ * keyboard shortcuts (Ctrl+S, Ctrl+P, F5, Ctrl+R, Ctrl+zoom, …). Every keydown
+ * has its browser default cancelled, in the capture phase so it happens before
+ * anything else. Exceptions, so the app stays usable from the keyboard:
+ *   - plain typing in the time fields / preset dropdown (no Ctrl/Alt/Meta);
+ *   - plain Tab / Shift+Tab to move focus;
+ *   - Enter on a focused button presses it (done here, since its default is cancelled).
+ * The app's own shortcuts (Space, R, M, F, arrows, +/-) still run: cancelling
+ * the default doesn't stop the event reaching the app's handler.
+ * Shortcuts handled by the browser or window manager before the page sees them
+ * (e.g. Alt+F4, and possibly Ctrl+W / Ctrl+N / Ctrl+T) can't be blocked by a page.
+ */
+function lockDownBrowserDefaults() {
+  addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
+  addEventListener('dragstart', (e) => e.preventDefault(), { capture: true });
+
+  addEventListener('keydown', (e) => {
+    const plain = !e.ctrlKey && !e.altKey && !e.metaKey;
+    const t = e.target;
+    if (plain && (t instanceof HTMLInputElement || t instanceof HTMLSelectElement)) return;
+    if (plain && e.key === 'Tab') return;
+    e.preventDefault();
+    if (plain && e.key === 'Enter' && t instanceof HTMLButtonElement) t.click();
+  }, { capture: true });
+}
+
 function bindEvents() {
   // Any interaction unlocks audio (needed when started via ?autostart=1).
   for (const type of ['pointerdown', 'keydown']) {
@@ -552,6 +579,8 @@ function bindEvents() {
       if (e.key === 'Escape') inp.blur();
     });
   }
+
+  lockDownBrowserDefaults();
 
   addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLInputElement || e.ctrlKey || e.altKey || e.metaKey) return;
