@@ -122,6 +122,7 @@ app/
   sw.js            service worker (network-first, cache fallback)
   manifest.json    PWA manifest
   icons/           SVG sources + generated PNGs (192, 512, maskable 512)
+tests/             optional Playwright browser tests (see tests/README.md)
 ```
 
 ## Design notes
@@ -132,6 +133,11 @@ app/
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
 - **Multiple windows:** each window is an independent timer. They share only the remembered duration and mute setting, as of the moment a window opens.
 - **Regenerating icons:** the PNG icons were rendered from the SVGs in `app/icons/` with headless Chromium. If you change the SVGs, re-render them (e.g. `rsvg-convert -w 512 icon.svg > icon-512.png` from `librsvg2-bin`) and bump `VERSION` in `sw.js`.
+
+## Tests
+
+Optional browser tests (Playwright) live in [`tests/`](tests/README.md): timer logic, the backwards hands,
+"closing stops the timer", the lock-down, layout at many window sizes, and offline start-up.
 
 ## License
 
