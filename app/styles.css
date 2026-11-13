@@ -285,3 +285,59 @@ button[aria-pressed="true"] { color: var(--muted); }
   .setter input, .colon { font-size: 15px; }
   .setter input { padding: 2px 0; }
 }
+
+/* ---------- experiment #12: controls overlaid on the clock, shown on hover ----------
+   Enabled by class="hover-controls" on <html>. The controls element is moved
+   inside .face by app.js, so its sizes can use the face's cqmin units. Its own
+   box is transparent and ignores the pointer; only the controls inside are
+   painted and clickable, and only while shown. */
+:root.hover-controls .app { grid-template-rows: minmax(0, 1fr); }
+:root.hover-controls .stage { padding: 12px; }
+
+:root.hover-controls .controls {
+  --pe: none;                       /* the overlay takes clicks only while shown */
+  position: absolute;
+  left: 50%;
+  bottom: 5cqmin;
+  width: max-content;               /* only as big as the controls it holds */
+  transform: translateX(-50%);
+  gap: 1.8cqmin;
+  padding: 0;
+  background: transparent;
+  pointer-events: var(--pe);
+  font-size: clamp(9px, 3.6cqmin, 16px);
+  opacity: 0;
+  transition: opacity 0.2s ease 0.3s;   /* hide after a short delay */
+}
+:root.hover-controls .face:hover .controls,
+:root.hover-controls .face:focus-within .controls {
+  --pe: auto;
+  opacity: 1;
+  transition-delay: 0s;                 /* show immediately */
+}
+:root.hover-controls .controls .row { gap: 0.45em; flex-wrap: nowrap; }
+:root.hover-controls .controls :is(button, input, select) {
+  font-size: 1em;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+/* Presets: always the compact dropdown in the overlay. */
+:root.hover-controls .presets { display: none; }
+:root.hover-controls .preset-select { display: inline-block; margin-left: 0.4em; padding: 0.25em 0.35em; }
+
+:root.hover-controls .setter input { font-size: 1.15em; padding: 0.15em 0; }
+/* Disabled (while running): dim the text, keep the background solid so the dial doesn't show through. */
+:root.hover-controls .setter input:disabled,
+:root.hover-controls .preset-select:disabled { opacity: 1; color: var(--muted); }
+:root.hover-controls .colon {
+  font-size: 1.15em;
+  color: var(--text);
+  text-shadow: 0 0 3px var(--face), 0 0 6px var(--face);   /* legible over the dial */
+}
+:root.hover-controls button.icon { width: 2.9em; height: 2.2em; padding: 0; }
+:root.hover-controls button.icon.primary { width: 3.9em; }
+:root.hover-controls button.icon svg { width: 1.35em; height: 1.35em; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root.hover-controls .controls { transition: none; }
+}

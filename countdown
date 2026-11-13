@@ -8,12 +8,12 @@
 # Environment overrides:
 #   COUNTDOWN_PORT     port for the local server          (default 8765)
 #   COUNTDOWN_BROWSER  browser executable to use           (default: first found)
-#   COUNTDOWN_SIZE     initial window size, WIDTH,HEIGHT   (default 440,620)
+#   COUNTDOWN_SIZE     initial window size, WIDTH,HEIGHT   (default 420,420)
 set -euo pipefail
 
 here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
 port=${COUNTDOWN_PORT:-8765}
-size=${COUNTDOWN_SIZE:-440,620}
+size=${COUNTDOWN_SIZE:-420,420}
 url="http://localhost:${port}/"
 if [[ $# -gt 0 ]]; then
   url+="?t=$(printf '%s' "$1" | sed 's/[^0-9a-zA-Z:.]//g')&autostart=1"
