@@ -57,4 +57,6 @@ To use a different Chromium binary instead of Playwright's own, set `CHROMIUM_PA
 
 **Not covered automatically:** whether Chromium itself skips its shortcuts (`Ctrl+S`, `F5`, …) once the page cancels them.
 Playwright's injected keys never trigger Chromium's own shortcuts, even without the lock-down, so check that by hand
-with a real keyboard.
+with a real keyboard. Last checked by hand on Kubuntu (Plasma 6.6.6, Wayland, Chromium 157 snap, app window):
+`Ctrl+S`, `Ctrl+P`, `F5`, `Ctrl+R`, `Ctrl+=`, `Ctrl+F`, `F12`, `Ctrl+Shift+I`, `Ctrl+U`, `Ctrl+T`, `Ctrl+N`, `Ctrl+W`
+and right-click were all blocked.
