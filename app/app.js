@@ -538,7 +538,9 @@ function toggleMute() {
  * The app's own shortcuts (Space, R, M, F, arrows, +/-) still run: cancelling
  * the default doesn't stop the event reaching the app's handler.
  * Shortcuts handled by the browser or window manager before the page sees them
- * (e.g. Alt+F4, and possibly Ctrl+W / Ctrl+N / Ctrl+T) can't be blocked by a page.
+ * (e.g. Alt+F4) can't be blocked by a page. Checked by hand in a Chromium 157
+ * app window on KDE Plasma 6.6 (Wayland): Ctrl+S/P/R/F/U/T/N/W, F5, F12,
+ * Ctrl+Shift+I, Ctrl+= and right-click are all blocked.
  */
 function lockDownBrowserDefaults() {
   addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });

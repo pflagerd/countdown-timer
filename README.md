@@ -28,7 +28,8 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
   - `Enter` on a focused button.
 
   Limits:
-  - Shortcuts handled by the window manager or the browser itself before the page sees them can't be blocked by a web page. That includes `Alt+F4`, and possibly `Ctrl+W`, `Ctrl+N` and `Ctrl+T`.
+  - Shortcuts the window manager handles before the page sees them can't be blocked by a web page. That includes `Alt+F4` and KDE's own shortcuts.
+  - **Checked by hand** on Kubuntu (Plasma 6.6.6, Wayland, Chromium 157 snap, app window): `Ctrl+S`, `Ctrl+P`, `F5`, `Ctrl+R`, `Ctrl+=`, `Ctrl+F`, `F12`, `Ctrl+Shift+I`, `Ctrl+U`, `Ctrl+T`, `Ctrl+N`, `Ctrl+W` and right-click are all blocked.
   - `Ctrl+A`/`C`/`V` don't work in the time fields either.
 - **Controls below or beside the clock, whichever gives the bigger clock.** On every resize the app tries both arrangements and keeps the one with the larger face. Once an arrangement is in use, it only switches when the other one would be more than 5 % bigger (`SWITCH_MARGIN` in `app.js`), so dragging the window edge near the cut-over doesn't make the layout flip back and forth. Tall and square windows put the controls below. Wide windows (e.g. 640×300, 1280×720, fullscreen on a 16:9 screen) put them in a column to the right, and the clock and controls stay together, centred in the window.
 - **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than face + controls, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the face and controls stay fully visible at any window size, just smaller.
