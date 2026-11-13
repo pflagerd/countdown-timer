@@ -67,6 +67,28 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
     const q = await open(URL + '?t=10m&autostart=1'); v = await view(p);
     t.check('#8 a second window is an independent timer', v.status === 'ready', v.status); await q.close();
 
+    // --- tooltip on disabled controls: shown only while the timer runs, only over disabled controls
+    {
+      const tip = (sel) => p.evaluate((sel) => getComputedStyle(document.querySelector(sel), '::after').opacity, sel);
+      await p.setViewportSize({ width: 440, height: 620 }); await p.goto(URL); await sleep(300);
+      await revealControls(p); await p.hover('#inM'); await sleep(300);
+      t.check('tooltip: not shown over the time fields when the timer is not running', (await tip('.setter')) === '0');
+      await p.evaluate(() => document.activeElement.blur()); await p.keyboard.press('Space'); await sleep(300);
+      await revealControls(p); await p.hover('#inM'); await sleep(300);
+      t.check('tooltip: shown over a disabled time field while running', (await tip('.setter')) === '1');
+      await p.hover('#startBtn'); await sleep(300);
+      t.check('tooltip: not shown over an enabled control while running', (await tip('.setter')) === '0' && (await tip('.presets')) === '0');
+      if (!hover) {
+        // The disabled buttons ignore the pointer (so hovering lands on their row); move the mouse there directly.
+        const bb = await p.locator('button[data-min="5"]').boundingBox();
+        await p.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await sleep(300);
+        t.check('tooltip: shown over the disabled preset buttons while running', (await tip('.presets')) === '1');
+        await p.mouse.click(...(await p.locator('button[data-min="45"]').boundingBox().then((bb) => [bb.x + bb.width / 2, bb.y + bb.height / 2])));
+        v = await view(p); t.check('disabled preset button click is ignored while running', v.status.startsWith('ends'), v.status);
+      }
+      await p.keyboard.press('r');
+    }
+
     // --- presets dropdown in small windows
     await p.setViewportSize({ width: 300, height: 420 }); await sleep(150);
     t.check('dropdown replaces the preset buttons in small windows', (await p.isVisible('#presetSelect')) && !(await p.isVisible('#presets')));

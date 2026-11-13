@@ -582,7 +582,7 @@ function bindEvents() {
 
   el.presets.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-min]');
-    if (b) setDuration(Number(b.dataset.min) * 60000);
+    if (b && state.status !== 'running') setDuration(Number(b.dataset.min) * 60000);
   });
 
   // Dropdown version of the presets (shown instead of the buttons in small

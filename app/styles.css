@@ -242,7 +242,35 @@ button[aria-pressed="true"] { color: var(--muted); }
 }
 .preset-select:disabled { opacity: 0.7; cursor: default; }
 .preset-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.presets[aria-disabled="true"] { opacity: 0.7; pointer-events: none; }
+.presets[aria-disabled="true"] { opacity: 0.7; }
+/* Disabled preset buttons ignore the pointer, so hovering lands on their row
+   (which shows the tooltip below) and clicks do nothing. */
+.presets[aria-disabled="true"] button { pointer-events: none; }
+
+/* Tooltip shown only while the pointer is over a disabled control: the time
+   fields and preset dropdown (.setter) or the preset buttons (.presets). */
+.setter, .presets { position: relative; }
+.setter::after, .presets::after {
+  content: "Disabled while the timer is running";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 2;
+  white-space: nowrap;
+  padding: 0.3em 0.65em;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bg);
+  background: var(--text);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.setter:has(:disabled:hover)::after,
+.presets[aria-disabled="true"]:hover::after { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .face.done .track { animation: none; stroke: color-mix(in srgb, var(--alarm) 45%, var(--track)); }
@@ -326,6 +354,7 @@ button[aria-pressed="true"] { color: var(--muted); }
 :root.hover-controls .preset-select { display: inline-block; margin-left: 0.4em; padding: 0.25em 0.35em; }
 
 :root.hover-controls .setter input { font-size: 1.15em; padding: 0.15em 0; }
+:root.hover-controls .setter::after { font-size: 0.85em; }
 /* Disabled (while running): dim the text, keep the background solid so the dial doesn't show through. */
 :root.hover-controls .setter input:disabled,
 :root.hover-controls .preset-select:disabled { opacity: 1; color: var(--muted); }
