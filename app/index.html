@@ -1,6 +1,5 @@
 <!doctype html>
-<!-- class="hover-controls": experiment #12, controls overlaid on the clock, shown on hover. Remove the class to get the original layout. -->
-<html lang="en" class="hover-controls">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -53,38 +52,36 @@
              aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="barFill"></span></div>
         <div class="status" id="status">ready</div>
       </div>
+      <!-- Controls overlaid on the clock, shown only while the pointer is over
+           it or keyboard focus is inside (#12). Their box is transparent and
+           only as big as the controls; clicks anywhere else start/pause. -->
+      <div class="controls" id="controls">
+        <div class="row setter" id="setter">
+          <input id="inH" inputmode="numeric" maxlength="2" aria-label="Hours"   value="00">
+          <span class="colon">:</span>
+          <input id="inM" inputmode="numeric" maxlength="2" aria-label="Minutes" value="05">
+          <span class="colon">:</span>
+          <input id="inS" inputmode="numeric" maxlength="2" aria-label="Seconds" value="00">
+          <select id="presetSelect" class="preset-select" aria-label="Preset duration">
+            <option value="">Preset…</option>
+            <option value="1">1m</option>
+            <option value="5">5m</option>
+            <option value="10">10m</option>
+            <option value="15">15m</option>
+            <option value="25">25m</option>
+            <option value="45">45m</option>
+            <option value="60">1h</option>
+          </select>
+        </div>
+        <div class="row actions">
+          <button class="icon primary" id="startBtn" title="Start (Space)" aria-label="Start"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
+          <button class="icon" id="resetBtn" title="Reset (R / Esc)" aria-label="Reset"><svg aria-hidden="true"><use href="#i-reset"/></svg></button>
+          <button class="icon" id="muteBtn" title="Mute (M)" aria-label="Mute" aria-pressed="false"><svg aria-hidden="true"><use href="#i-sound"/></svg></button>
+          <button class="icon" id="fsBtn" title="Fullscreen (F)" aria-label="Fullscreen"><svg aria-hidden="true"><use href="#i-fs"/></svg></button>
+        </div>
+      </div>
     </div>
   </main>
-
-  <footer class="controls" id="controls">
-    <div class="row setter" id="setter">
-      <input id="inH" inputmode="numeric" maxlength="2" aria-label="Hours"   value="00">
-      <span class="colon">:</span>
-      <input id="inM" inputmode="numeric" maxlength="2" aria-label="Minutes" value="05">
-      <span class="colon">:</span>
-      <input id="inS" inputmode="numeric" maxlength="2" aria-label="Seconds" value="00">
-      <!-- Compact stand-in for the preset buttons in small windows (options are
-           built from the buttons below by app.js). -->
-      <select id="presetSelect" class="preset-select" aria-label="Preset duration">
-        <option value="">Preset…</option>
-      </select>
-    </div>
-    <div class="row presets" id="presets">
-      <button data-min="1">1m</button>
-      <button data-min="5">5m</button>
-      <button data-min="10">10m</button>
-      <button data-min="15">15m</button>
-      <button data-min="25">25m</button>
-      <button data-min="45">45m</button>
-      <button data-min="60">1h</button>
-    </div>
-    <div class="row actions">
-      <button class="icon primary" id="startBtn" title="Start (Space)" aria-label="Start"><svg aria-hidden="true"><use href="#i-play"/></svg></button>
-      <button class="icon" id="resetBtn" title="Reset (R / Esc)" aria-label="Reset"><svg aria-hidden="true"><use href="#i-reset"/></svg></button>
-      <button class="icon" id="muteBtn" title="Mute (M)" aria-label="Mute" aria-pressed="false"><svg aria-hidden="true"><use href="#i-sound"/></svg></button>
-      <button class="icon" id="fsBtn" title="Fullscreen (F)" aria-label="Fullscreen"><svg aria-hidden="true"><use href="#i-fs"/></svg></button>
-    </div>
-  </footer>
   </div>
 </body>
 </html>

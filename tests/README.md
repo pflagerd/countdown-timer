@@ -51,7 +51,7 @@ To use a different Chromium binary instead of Playwright's own, set `CHROMIUM_PA
 
 | Suite | Checks |
 |---|---|
-| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown.** **Layout:** 10 window sizes, below/beside choice, 5 % switching margin. **Offline:** reload served from the service-worker cache. |
+| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown**, and the tooltip on disabled controls. **Controls overlay:** hidden until hover or focus, only as big as the controls, clicks outside it start/pause. **Layout:** 10 window sizes. **Offline:** reload served from the service-worker cache. |
 | `lockdown.js` | Right-click, dragging and 23 browser shortcuts are cancelled. The app's own keys, typing in the time fields, Tab, Enter on buttons and the dropdown still work. |
 | `app-window.js` | A real `chromium --app=…` window: #8 end to end (reload keeps the timer; quitting and relaunching gives READY) and `window.close()`. |
 

@@ -19,7 +19,7 @@ const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', '
   const srv = await startServer(port);
   const t = reporter('lockdown');
   const b = await chromium.launch(launchOptions());
-  const p = await b.newPage({ viewport: { width: 440, height: 620 } });
+  const p = await b.newPage({ viewport: { width: 420, height: 420 } });
   const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
   try {
     await p.goto(URL);
@@ -81,7 +81,7 @@ const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', '
     await p.keyboard.press('r');
 
     // 6. the preset dropdown still works
-    await p.setViewportSize({ width: 300, height: 420 }); await p.selectOption('#presetSelect', '25'); v = await view(p);
+    await p.selectOption('#presetSelect', '25'); v = await view(p);
     t.check('preset dropdown still works', v.digits === '25:00', v.digits);
   } catch (e) {
     t.check('test run completed without exceptions', false, e.message);

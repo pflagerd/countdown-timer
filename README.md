@@ -16,7 +16,12 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
-- **Controls always visible.** The controls at the bottom never fade or hide. The action buttons are icons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. When the window gets smaller, the clock face shrinks and the controls get more compact.
+- **Just the clock; controls on hover.** The clock is the only thing permanently on screen, so the window can be small and square.
+  - **Showing the controls:** they appear over the bottom of the clock while the pointer is over it, or when `Tab` moves keyboard focus into them. They fade out about 0.3 s after the pointer leaves.
+  - **The overlay:** they sit on a transparent overlay that is only as big as the controls, so only the controls themselves cover the clock.
+  - **Clicking:** a click anywhere else in the window starts or pauses the timer. A click on a control, or in the gaps between controls, never does.
+  - **What they are:** the `hh : mm : ss` fields, a **Preset…** dropdown, and icon buttons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. They scale with the clock.
+  - **While the timer runs:** the time fields and the preset dropdown are disabled. Hovering them shows "Disabled while the timer is running".
 - **Locked down like a kiosk.** The page cancels:
   - the right-click menu, and dragging;
   - browser keyboard shortcuts such as `Ctrl+S`, `Ctrl+P`, `F5`/`Ctrl+R`, `Ctrl`+`+`/`-`/`0` (zoom), `Ctrl+F` and `F12`.
@@ -31,16 +36,10 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
   - Shortcuts the window manager handles before the page sees them can't be blocked by a web page. That includes `Alt+F4` and KDE's own shortcuts.
   - **Checked by hand** on Kubuntu (Plasma 6.6.6, Wayland, Chromium 157 snap, app window): `Ctrl+S`, `Ctrl+P`, `F5`, `Ctrl+R`, `Ctrl+=`, `Ctrl+F`, `F12`, `Ctrl+Shift+I`, `Ctrl+U`, `Ctrl+T`, `Ctrl+N`, `Ctrl+W` and right-click are all blocked.
   - `Ctrl+A`/`C`/`V` don't work in the time fields either.
-- **Controls below or beside the clock, whichever gives the bigger clock.** On every resize the app tries both arrangements and keeps the one with the larger face. Once an arrangement is in use, it only switches when the other one would be more than 5 % bigger (`SWITCH_MARGIN` in `app.js`), so dragging the window edge near the cut-over doesn't make the layout flip back and forth. Tall and square windows put the controls below. Wide windows (e.g. 640×300, 1280×720, fullscreen on a 16:9 screen) put them in a column to the right, and the clock and controls stay together, centred in the window.
-- **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than face + controls, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the face and controls stay fully visible at any window size, just smaller.
+- **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than that, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the clock stays fully visible at any window size, just smaller.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
 No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.
-
-> **Experiment (#12) on this branch:** the controls are hidden, and appear over the bottom of the clock only while the
-> pointer is over it, or when `Tab` moves keyboard focus into them. The overlay that holds them is transparent and only as big as the controls.
-> Clicking anywhere else in the window starts or pauses the timer. `./countdown` opens a square 420×420 window.
-> To get the original layout back, remove `class="hover-controls"` from `<html>` in `app/index.html`.
 
 ## Quick start
 
@@ -79,7 +78,7 @@ python3 serve.py --port 8765 --quiet
 `serve.py` is a thin wrapper around Python's standard [`http.server`](https://docs.python.org/3/library/http.server.html) module. It adds two things: explicit MIME types, and a `Cache-Control: no-cache` header so edits show up on the next reload.
 
 ```bash
-chromium --app=http://localhost:8765/ --window-size=440,620
+chromium --app=http://localhost:8765/ --window-size=420,420
 ```
 
 - `--app=<url>` opens the URL in a window with no browser UI.
@@ -104,13 +103,14 @@ Because the service worker is network-first with a cache fallback, the installed
 
 | Action | Mouse | Keyboard |
 |---|---|---|
-| Start / pause / resume | click the face or ▶ / ❚❚ | `Space` |
-| Dismiss the alarm | click the face or ■ | `Space` / `Esc` |
+| Start / pause / resume | click anywhere outside the controls, or ▶ / ❚❚ | `Space` |
+| Dismiss the alarm | click anywhere outside the controls, or ■ | `Space` / `Esc` |
 | Reset | ⟲ | `R` / `Esc` |
 | ±1 minute (works while running too) | | `↑` `↓` or `+` `-` |
 | ±10 minutes | | `Shift`+`↑` / `Shift`+`↓` |
+| Show the controls | hover over the clock | `Tab` |
 | Set an exact time | type into the `hh : mm : ss` fields, then `Enter` to start | |
-| Presets | 1m 5m 10m 15m 25m 45m 1h. In small windows (height ≤ 520 px or width ≤ 380 px) the buttons fold into a **Preset…** dropdown next to the time fields. | |
+| Presets | **Preset…** dropdown: 1m 5m 10m 15m 25m 45m 1h | |
 | Mute / unmute | speaker icon | `M` |
 | Fullscreen | ⛶ | `F` |
 

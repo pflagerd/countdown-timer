@@ -1,6 +1,6 @@
 'use strict';
 // Functional, layout, #8 (closing stops the timer) and offline checks. Headless.
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, isHoverMode, revealControls } = require('./lib');
+const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, revealControls } = require('./lib');
 
 (async () => {
   const port = await freePort();
@@ -8,7 +8,7 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
   let srv = await startServer(port);
   const t = reporter('regress');
   const b = await chromium.launch(launchOptions());
-  const ctx = await b.newContext({ viewport: { width: 440, height: 620 } });
+  const ctx = await b.newContext({ viewport: { width: 420, height: 420 } });
   const errs = []; ctx.on('weberror', (e) => errs.push(String(e.error())));
   const open = async (u = URL) => { const p = await ctx.newPage(); await p.goto(u); await sleep(250); return p; };
   try {
@@ -27,9 +27,7 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
     t.check("finishes: overtime, TIME'S UP, ⏰ in title", v.status === "time's up" && v.digits.startsWith('+') && v.title.startsWith('⏰'), JSON.stringify(v));
     await p.keyboard.press('Escape'); v = await view(p);
     t.check('Esc resets to the duration', v.status === 'ready' && v.digits === '00:12', v.digits);
-    const hover = await isHoverMode(p);
-    if (hover) await p.selectOption('#presetSelect', '60');
-    else await p.click('button[data-min="60"]');
+    await p.selectOption('#presetSelect', '60');
     await p.keyboard.press('ArrowUp'); v = await view(p);
     t.check('preset 1h + ArrowUp = 1:01:00', v.digits === '1:01:00', v.digits);
     await p.keyboard.press('Space'); await sleep(1300); v = await view(p);
@@ -70,35 +68,28 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
     // --- tooltip on disabled controls: shown only while the timer runs, only over disabled controls
     {
       const tip = (sel) => p.evaluate((sel) => getComputedStyle(document.querySelector(sel), '::after').opacity, sel);
-      await p.setViewportSize({ width: 440, height: 620 }); await p.goto(URL); await sleep(300);
+      await p.goto(URL); await sleep(300);
       await revealControls(p); await p.hover('#inM'); await sleep(300);
       t.check('tooltip: not shown over the time fields when the timer is not running', (await tip('.setter')) === '0');
       await p.evaluate(() => document.activeElement.blur()); await p.keyboard.press('Space'); await sleep(300);
       await revealControls(p); await p.hover('#inM'); await sleep(300);
       t.check('tooltip: shown over a disabled time field while running', (await tip('.setter')) === '1');
       await p.hover('#startBtn'); await sleep(300);
-      t.check('tooltip: not shown over an enabled control while running', (await tip('.setter')) === '0' && (await tip('.presets')) === '0');
-      if (!hover) {
-        // The disabled buttons ignore the pointer (so hovering lands on their row); move the mouse there directly.
-        const bb = await p.locator('button[data-min="5"]').boundingBox();
-        await p.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await sleep(300);
-        t.check('tooltip: shown over the disabled preset buttons while running', (await tip('.presets')) === '1');
-        await p.mouse.click(...(await p.locator('button[data-min="45"]').boundingBox().then((bb) => [bb.x + bb.width / 2, bb.y + bb.height / 2])));
-        v = await view(p); t.check('disabled preset button click is ignored while running', v.status.startsWith('ends'), v.status);
-      }
+      t.check('tooltip: not shown over an enabled control while running', (await tip('.setter')) === '0');
+      await p.hover('#presetSelect'); await sleep(300);
+      t.check('tooltip: shown over the disabled preset dropdown while running', (await tip('.setter')) === '1');
       await p.keyboard.press('r');
     }
 
-    // --- presets dropdown in small windows
-    await p.setViewportSize({ width: 300, height: 420 }); await sleep(150);
-    t.check('dropdown replaces the preset buttons in small windows', (await p.isVisible('#presetSelect')) && !(await p.isVisible('#presets')));
+    // --- presets dropdown
+    t.check('presets are a dropdown (no row of preset buttons)', (await p.locator('#presetSelect option').count()) === 8 && (await p.locator('#presets').count()) === 0);
     await p.selectOption('#presetSelect', '25'); v = await view(p);
     t.check('dropdown: 25 sets 25:00 and resets to "Preset…"', v.digits === '25:00' && (await p.inputValue('#presetSelect')) === '', v.digits);
     await p.keyboard.press('Space'); await sleep(300);
     t.check('dropdown is disabled while running', await p.isDisabled('#presetSelect')); await p.keyboard.press('r');
 
-    if (hover) {
-      // --- experiment #12: controls overlaid on the clock, shown only on hover / focus
+    {
+      // --- controls overlaid on the clock, shown only on hover / focus (#12)
       const ctl = () => p.evaluate(() => {
         const c = document.getElementById('controls'), f = document.getElementById('face');
         const r = document.getElementById('startBtn').getBoundingClientRect();
@@ -107,14 +98,14 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
       });
       await p.setViewportSize({ width: 420, height: 420 }); await p.goto(URL); await sleep(300);
       await p.mouse.move(0, 0); await sleep(800); let c = await ctl();
-      t.check('hover mode: controls sit inside the clock face', c.inFace);
-      t.check('hover mode: controls hidden and not clickable when the pointer is away', c.opacity === '0' && !c.startHit, JSON.stringify(c));
+      t.check('overlay: controls sit inside the clock face', c.inFace);
+      t.check('overlay: controls hidden and not clickable when the pointer is away', c.opacity === '0' && !c.startHit, JSON.stringify(c));
       await p.mouse.move(210, 210); await sleep(400); c = await ctl();
-      t.check('hover mode: controls shown and clickable while hovering the clock', c.opacity === '1' && c.startHit, JSON.stringify(c));
+      t.check('overlay: controls shown and clickable while hovering the clock', c.opacity === '1' && c.startHit, JSON.stringify(c));
       await p.click('#resetBtn'); v = await view(p);
-      t.check('hover mode: clicking a control does not also start the timer', v.status === 'ready', v.status);
+      t.check('overlay: clicking a control does not also start the timer', v.status === 'ready', v.status);
       await p.mouse.click(210, 120); await sleep(300); v = await view(p);
-      t.check('hover mode: clicking the clock (outside the controls) starts the timer', v.status.startsWith('ends'), v.status);
+      t.check('overlay: clicking the clock (outside the controls) starts the timer', v.status.startsWith('ends'), v.status);
       await p.keyboard.press('r');
       // The overlay is only as big as the controls: its width equals its widest row.
       const box = await p.evaluate(() => {
@@ -126,55 +117,39 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, i
         const a = document.getElementById('startBtn').getBoundingClientRect(), b = document.getElementById('resetBtn').getBoundingClientRect();
         return { overlay: Math.round(c.width), widestRow: Math.round(Math.max(...rows)), gapX: (a.right + b.left) / 2, gapY: (a.top + a.bottom) / 2 };
       });
-      t.check('hover mode: overlay is only as wide as its widest row of controls', Math.abs(box.overlay - box.widestRow) <= 2, `${box.overlay} vs ${box.widestRow}`);
+      t.check('overlay: overlay is only as wide as its widest row of controls', Math.abs(box.overlay - box.widestRow) <= 2, `${box.overlay} vs ${box.widestRow}`);
       await p.mouse.click(box.gapX, box.gapY); await sleep(300); v = await view(p);
-      t.check('hover mode: clicking a gap inside the overlay does not start the timer', v.status === 'ready', v.status);
+      t.check('overlay: clicking a gap inside the overlay does not start the timer', v.status === 'ready', v.status);
       await p.setViewportSize({ width: 700, height: 320 }); await sleep(200);
       await p.mouse.click(20, 160); await sleep(300); v = await view(p);
-      t.check('hover mode: clicking the window margin outside the clock starts the timer', v.status.startsWith('ends'), v.status);
+      t.check('overlay: clicking the window margin outside the clock starts the timer', v.status.startsWith('ends'), v.status);
       await p.mouse.click(680, 300); await sleep(300); v = await view(p);
-      t.check('hover mode: ...and clicking again pauses it', v.status === 'paused', v.status);
+      t.check('overlay: ...and clicking again pauses it', v.status === 'paused', v.status);
       await p.keyboard.press('r'); await p.setViewportSize({ width: 420, height: 420 }); await sleep(200);
       await p.mouse.move(0, 0); await sleep(800); await p.focus('#inM'); await sleep(300); c = await ctl();
-      t.check('hover mode: keyboard focus in the controls reveals them', c.opacity === '1', c.opacity);
+      t.check('overlay: keyboard focus in the controls reveals them', c.opacity === '1', c.opacity);
       await p.evaluate(() => document.activeElement.blur());
     }
 
     // --- layout invariants across window sizes
-    const bad = []; const modes = {};
+    const bad = [];
     for (const [w, h] of [[440, 620], [440, 500], [640, 300], [900, 150], [1280, 720], [1920, 1080], [260, 260], [150, 900], [80, 80], [500, 500]]) {
       await p.setViewportSize({ width: w, height: h }); await sleep(120);
-      const i = await p.evaluate((hoverMode) => {
+      const i = await p.evaluate(() => {
         const f = document.getElementById('face').getBoundingClientRect(), c = document.getElementById('controls').getBoundingClientRect();
         const s = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale'));
         const se = document.scrollingElement;
         const inView = (x) => x.left >= -0.5 && x.top >= -0.5 && x.right <= innerWidth + 0.5 && x.bottom <= innerHeight + 0.5;
-        const overlap = !(f.right <= c.left + 0.5 || c.right <= f.left + 0.5 || f.bottom <= c.top + 0.5 || c.bottom <= f.top + 0.5);
-        // In hover mode the controls are meant to overlap the clock (experiment #12).
-        return { ok: inView(f) && inView(c) && (hoverMode || !overlap) && se.scrollWidth <= innerWidth && se.scrollHeight <= innerHeight && f.width / s >= 199,
-                 wide: document.documentElement.classList.contains('wide') };
-      }, hover);
+        // The controls are overlaid on the clock (#12): they must stay inside the face and the window.
+        const inFace = c.left >= f.left - 0.5 && c.right <= f.right + 0.5 && c.top >= f.top - 0.5 && c.bottom <= f.bottom + 0.5;
+        return { ok: inView(f) && inView(c) && inFace && se.scrollWidth <= innerWidth && se.scrollHeight <= innerHeight && f.width / s >= 199 };
+      });
       if (!i.ok) bad.push(`${w}x${h}`);
-      modes[`${w}x${h}`] = i.wide ? 'beside' : 'below';
     }
-    t.check(`layout: no scroll bars, all visible, ${hover ? 'controls within the window' : 'no overlap'}, face >= 200px (10 sizes)`, bad.length === 0, bad.join(' ') || 'ok');
-    if (hover) {
-      t.check('hover mode: never uses the beside layout', Object.values(modes).every((m) => m === 'below'), JSON.stringify(modes));
-    } else {
-    t.check('layout: controls beside the clock in wide windows, below otherwise',
-      modes['1280x720'] === 'beside' && modes['640x300'] === 'beside' && modes['440x620'] === 'below' && modes['150x900'] === 'below', JSON.stringify(modes));
-
-    // --- 5 % hysteresis: at 640 wide, the switch height depends on direction
-    let down = null, up = null, last = null;
-    for (let h = 700; h >= 380; h -= 10) { await p.setViewportSize({ width: 640, height: h }); await sleep(30);
-      const m = await p.evaluate(() => document.documentElement.classList.contains('wide')); if (last !== null && m !== last) down = h; last = m; }
-    for (let h = 380; h <= 700; h += 10) { await p.setViewportSize({ width: 640, height: h }); await sleep(30);
-      const m = await p.evaluate(() => document.documentElement.classList.contains('wide')); if (m !== last) up = h; last = m; }
-    t.check('layout: 5 % switching margin (switch heights differ by direction)', down !== null && up !== null && up > down, `down@${down} up@${up}`);
-    }
+    t.check('layout: no scroll bars, clock fully visible and >= 200px, controls inside the clock (10 sizes)', bad.length === 0, bad.join(' ') || 'ok');
 
     // --- offline: server stopped, reload served from the service-worker cache
-    await p.setViewportSize({ width: 440, height: 620 }); await p.goto(URL);
+    await p.setViewportSize({ width: 420, height: 420 }); await p.goto(URL);
     await p.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
     srv.kill(); srv = null; await sleep(400);
     const r = await p.reload().catch(() => null);
