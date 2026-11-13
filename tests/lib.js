@@ -75,4 +75,14 @@ function view(page) {
   }));
 }
 
-module.exports = { chromium, ROOT, sleep, freePort, startServer, launchOptions, reporter, view };
+/** True when the page uses the hover-controls overlay (experiment #12). */
+function isHoverMode(page) {
+  return page.evaluate(() => document.documentElement.classList.contains('hover-controls'));
+}
+
+/** In hover mode the controls only take clicks while the pointer is over the clock: hover it first. */
+async function revealControls(page) {
+  if (await isHoverMode(page)) { await page.hover('#face', { position: { x: 10, y: 10 } }); await sleep(250); }
+}
+
+module.exports = { chromium, ROOT, sleep, freePort, startServer, launchOptions, reporter, view, isHoverMode, revealControls };

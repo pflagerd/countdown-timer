@@ -242,7 +242,35 @@ button[aria-pressed="true"] { color: var(--muted); }
 }
 .preset-select:disabled { opacity: 0.7; cursor: default; }
 .preset-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.presets[aria-disabled="true"] { opacity: 0.7; pointer-events: none; }
+.presets[aria-disabled="true"] { opacity: 0.7; }
+/* Disabled preset buttons ignore the pointer, so hovering lands on their row
+   (which shows the tooltip below) and clicks do nothing. */
+.presets[aria-disabled="true"] button { pointer-events: none; }
+
+/* Tooltip shown only while the pointer is over a disabled control: the time
+   fields and preset dropdown (.setter) or the preset buttons (.presets). */
+.setter, .presets { position: relative; }
+.setter::after, .presets::after {
+  content: "Disabled while the timer is running";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%);
+  z-index: 2;
+  white-space: nowrap;
+  padding: 0.3em 0.65em;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--bg);
+  background: var(--text);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.setter:has(:disabled:hover)::after,
+.presets[aria-disabled="true"]:hover::after { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .face.done .track { animation: none; stroke: color-mix(in srgb, var(--alarm) 45%, var(--track)); }
@@ -284,4 +312,61 @@ button[aria-pressed="true"] { color: var(--muted); }
   button.icon svg { width: 18px; height: 18px; }
   .setter input, .colon { font-size: 15px; }
   .setter input { padding: 2px 0; }
+}
+
+/* ---------- experiment #12: controls overlaid on the clock, shown on hover ----------
+   Enabled by class="hover-controls" on <html>. The controls element is moved
+   inside .face by app.js, so its sizes can use the face's cqmin units. Its own
+   box is transparent and ignores the pointer; only the controls inside are
+   painted and clickable, and only while shown. */
+:root.hover-controls .app { grid-template-rows: minmax(0, 1fr); }
+:root.hover-controls .stage { padding: 12px; }
+
+:root.hover-controls .controls {
+  --pe: none;                       /* the overlay takes clicks only while shown */
+  position: absolute;
+  left: 50%;
+  bottom: 5cqmin;
+  width: max-content;               /* only as big as the controls it holds */
+  transform: translateX(-50%);
+  gap: 1.8cqmin;
+  padding: 0;
+  background: transparent;
+  pointer-events: var(--pe);
+  font-size: clamp(9px, 3.6cqmin, 16px);
+  opacity: 0;
+  transition: opacity 0.2s ease 0.3s;   /* hide after a short delay */
+}
+:root.hover-controls .face:hover .controls,
+:root.hover-controls .face:focus-within .controls {
+  --pe: auto;
+  opacity: 1;
+  transition-delay: 0s;                 /* show immediately */
+}
+:root.hover-controls .controls .row { gap: 0.45em; flex-wrap: nowrap; }
+:root.hover-controls .controls :is(button, input, select) {
+  font-size: 1em;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+/* Presets: always the compact dropdown in the overlay. */
+:root.hover-controls .presets { display: none; }
+:root.hover-controls .preset-select { display: inline-block; margin-left: 0.4em; padding: 0.25em 0.35em; }
+
+:root.hover-controls .setter input { font-size: 1.15em; padding: 0.15em 0; }
+:root.hover-controls .setter::after { font-size: 0.85em; }
+/* Disabled (while running): dim the text, keep the background solid so the dial doesn't show through. */
+:root.hover-controls .setter input:disabled,
+:root.hover-controls .preset-select:disabled { opacity: 1; color: var(--muted); }
+:root.hover-controls .colon {
+  font-size: 1.15em;
+  color: var(--text);
+  text-shadow: 0 0 3px var(--face), 0 0 6px var(--face);   /* legible over the dial */
+}
+:root.hover-controls button.icon { width: 2.9em; height: 2.2em; padding: 0; }
+:root.hover-controls button.icon.primary { width: 3.9em; }
+:root.hover-controls button.icon svg { width: 1.35em; height: 1.35em; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root.hover-controls .controls { transition: none; }
 }

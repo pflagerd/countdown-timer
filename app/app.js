@@ -447,6 +447,7 @@ const MIN_LAYOUT_W = 250;   // face-min + side padding, and room for the control
 const SWITCH_MARGIN = 0.05;
 let currentWide = null;     // null = not decided yet
 function fitToWindow() {
+  if (hoverControls()) { fitClockOnly(); return; }
   const stacked = applyLayout(false);
   const wide = applyLayout(true);
   let useWide;
@@ -455,6 +456,29 @@ function fitToWindow() {
   else useWide = wide.face > stacked.face * (1 + SWITCH_MARGIN);
   currentWide = useWide;
   if (!useWide) applyLayout(false);   // applyLayout(true) ran last, so only "below" needs re-applying
+}
+
+/*
+ * Experiment #12 (html.hover-controls): the controls are overlaid on the clock
+ * face and only shown while the pointer is over it (or keyboard focus is in
+ * them). The window then holds just the clock, so only the clock has to fit.
+ */
+function hoverControls() { return document.documentElement.classList.contains('hover-controls'); }
+
+function fitClockOnly() {
+  const root = document.documentElement;
+  root.classList.remove('wide');
+  const faceMin = parseFloat(getComputedStyle(root).getPropertyValue('--face-min')) || 200;
+  root.style.setProperty('--ui-scale', '1');
+  const cs = getComputedStyle(document.querySelector('.stage'));
+  const needW = faceMin + parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  const needH = faceMin + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  root.style.setProperty('--ui-scale', String(Math.min(1, innerWidth / needW, innerHeight / needH)));
+}
+
+/** Move the controls into the clock face, where CSS overlays them (hover mode only). */
+function placeControls() {
+  if (hoverControls()) el.face.appendChild(document.getElementById('controls'));
 }
 
 /** Apply one arrangement, scale it to fit, and report the resulting face size (screen px). */
@@ -543,7 +567,14 @@ function bindEvents() {
     btn.addEventListener('pointerup', () => btn.blur());
   }
 
-  el.face.addEventListener('click', toggle);
+  // Click to start / pause / dismiss.
+  //  - Normal layout: clicking the clock face.
+  //  - Hover mode (#12): clicking anywhere in the window except the overlay,
+  //    which is only as big as the controls it holds (gaps included).
+  document.addEventListener('click', (e) => {
+    if (e.button !== 0 || e.target.closest('#controls')) return;
+    if (hoverControls() || e.target.closest('#face')) toggle();
+  });
   el.startBtn.addEventListener('click', toggle);
   el.resetBtn.addEventListener('click', reset);
   el.muteBtn.addEventListener('click', toggleMute);
@@ -553,7 +584,7 @@ function bindEvents() {
 
   el.presets.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-min]');
-    if (b) setDuration(Number(b.dataset.min) * 60000);
+    if (b && state.status !== 'running') setDuration(Number(b.dataset.min) * 60000);
   });
 
   // Dropdown version of the presets (shown instead of the buttons in small
@@ -630,6 +661,7 @@ function applyUrlParams() {
 }
 
 function boot() {
+  placeControls();
   fitToWindow();
   buildDial();
   load();

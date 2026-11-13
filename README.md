@@ -37,6 +37,11 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 
 No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.
 
+> **Experiment (#12) on this branch:** the controls are hidden, and appear over the bottom of the clock only while the
+> pointer is over it, or when `Tab` moves keyboard focus into them. The overlay that holds them is transparent and only as big as the controls.
+> Clicking anywhere else in the window starts or pauses the timer. `./countdown` opens a square 420×420 window.
+> To get the original layout back, remove `class="hover-controls"` from `<html>` in `app/index.html`.
+
 ## Quick start
 
 ```bash
@@ -59,7 +64,7 @@ Environment overrides for `./countdown`:
 |---|---|---|
 | `COUNTDOWN_PORT` | `8765` | Port for the local server. **Note:** the origin includes the port, so a different port is a different app with separate storage and a separate install. |
 | `COUNTDOWN_BROWSER` | first one found of `chromium`, `chromium-browser`, `google-chrome-stable`, `google-chrome`, `brave-browser`, `microsoft-edge` | Browser executable |
-| `COUNTDOWN_SIZE` | `440,620` | Initial window `WIDTH,HEIGHT` in pixels |
+| `COUNTDOWN_SIZE` | `420,420` | Initial window `WIDTH,HEIGHT` in pixels |
 
 ### What the launcher actually runs
 

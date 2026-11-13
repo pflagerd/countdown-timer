@@ -7,7 +7,7 @@
 // its default). Playwright's injected keys never trigger Chromium's own
 // shortcuts, even without the lock-down, so whether Chromium actually skips
 // e.g. Ctrl+S has to be checked by hand with a real keyboard.
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view } = require('./lib');
+const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, revealControls } = require('./lib');
 
 const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', 'Control+Minus', 'Control+0', 'Control+f', 'Control+u',
   'F12', 'Control+Shift+i', 'Control+a', 'Alt+ArrowLeft', 'Backspace', 'F11', 'Control+t', 'Control+n', 'Control+w',
@@ -40,6 +40,7 @@ const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', '
 
     // 2. right-click and dragging
     for (const sel of ['#face', '#startBtn', '#inM']) {
+      await revealControls(p);
       await p.click(sel, { button: 'right' }); l = await last();
       t.check(`right-click on ${sel}: context menu cancelled`, l.type === 'contextmenu' && l.prevented);
     }
@@ -58,7 +59,7 @@ const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', '
     await p.keyboard.press('r'); v = await view(p); t.check('R resets', v.status === 'ready' && v.digits === '06:00', v.digits);
 
     // 4. typing in the time fields
-    await p.click('#inM'); await p.keyboard.type('12'); v = await view(p);
+    await revealControls(p); await p.click('#inM'); await p.keyboard.type('12'); v = await view(p);
     t.check('typing 12 in the minutes field sets 12:00', v.digits === '12:00', v.digits);
     await p.keyboard.press('Backspace'); l = await last();
     t.check('Backspace works in a field', !l.prevented && (await p.inputValue('#inM')) === '1', await p.inputValue('#inM'));
