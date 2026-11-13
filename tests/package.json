@@ -1,0 +1,12 @@
+{
+  "name": "countdown-timer-tests",
+  "private": true,
+  "description": "Browser tests for the countdown timer (optional developer tool; the app itself has no dependencies).",
+  "scripts": {
+    "test": "node run-all.js",
+    "test:headed": "node run-all.js --headed"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  }
+}
