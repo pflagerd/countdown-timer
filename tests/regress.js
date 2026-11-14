@@ -156,19 +156,21 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
     if (target.mode === 'server') {
       // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
       //     shortcuts point at it by name (so they also work on servers without that default)
-      const pages = await p.evaluate(async (base) => {
+      // Fetched from the test (Node), not the page: the deliberate index.html 404 would
+      // otherwise show up as a console error in the page.
+      const pages = await (async (base) => {
         const isApp = async (u) => { const r = await fetch(u); return r.ok && (await r.text()).includes('id="face"'); };
-        const m = await (await fetch(new URL('manifest.json', base))).json();
-        const resolve = (u) => new URL(u, new URL('manifest.json', base)).href;
+        const m = await (await fetch(new globalThis.URL('manifest.json', base))).json();
+        const resolve = (u) => new globalThis.URL(u, new globalThis.URL('manifest.json', base)).href;
         return {
           root: await isApp(base),
-          byName: await isApp(new URL('countdown.html', base)),
-          noIndexHtml: (await fetch(new URL('index.html', base))).status,
+          byName: await isApp(new globalThis.URL('countdown.html', base)),
+          noIndexHtml: (await fetch(new globalThis.URL('index.html', base))).status,
           startUrl: m.start_url, start: await isApp(resolve(m.start_url)),
           shortcuts: await Promise.all(m.shortcuts.map((s) => isApp(resolve(s.url)))),
           id: m.id,
         };
-      }, URL);
+      })(URL);
       t.check('"/" serves the app page (countdown.html); there is no index.html', pages.root && pages.byName && pages.noIndexHtml === 404, JSON.stringify(pages));
       t.check('manifest start_url and both shortcuts point at countdown.html and load', pages.startUrl === './countdown.html' && pages.start && pages.shortcuts.length === 2 && pages.shortcuts.every(Boolean), JSON.stringify(pages));
       t.check('manifest id unchanged ("./"), so an installed copy stays the same app', pages.id === './', pages.id);
