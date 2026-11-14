@@ -165,15 +165,6 @@ body {
   min-height: 1.2em;
 }
 
-.sound-hint {
-  margin-top: 1.2cqmin;
-  font-size: 3cqmin;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--warn);
-}
-.sound-hint[hidden] { display: none; }
-
 .face.warn { --current: var(--warn); }
 .face.done { --current: var(--alarm); }
 .face.done .digits { color: var(--alarm); }

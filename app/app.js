@@ -30,7 +30,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'), hourLabels: $('hourLabels'),
   hourHand: $('hourHand'), minHand: $('minHand'), secHand: $('secHand'),
-  digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'), soundHint: $('soundHint'),
+  digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presetSelect: $('presetSelect'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
 };
@@ -186,20 +186,6 @@ function chime() {
     .then(() => { if (!state.muted && state.status === 'done' && audioCtx.state === 'running') playChime(); })
     .catch(() => {})
     .finally(() => { resumePending = false; });
-}
-
-/**
- * True while the timer is running / ringing but the chime can't be heard yet
- * because the browser blocks sound until the user clicks or presses a key.
- * Used to show the "click for sound" hint.
- */
-function soundBlocked() {
-  if (state.muted || (state.status !== 'running' && state.status !== 'done')) return false;
-  if (audioCtx && audioCtx.state === 'running') return false;
-  if (typeof navigator.getAutoplayPolicy === 'function') {
-    try { return navigator.getAutoplayPolicy('audiocontext') !== 'allowed'; } catch { /* fall through */ }
-  }
-  return !(navigator.userActivation && navigator.userActivation.hasBeenActive);
 }
 
 let alarmTimer = 0;
@@ -398,14 +384,12 @@ function render(now = Date.now()) {
 
   let status;
   switch (state.status) {
-    case 'running': status = `ends ${endTimeFmt.format(state.endAt)}`; break;
+    case 'running': status = `ends at ${endTimeFmt.format(state.endAt)}`; break;   // shown upper-case: "ENDS AT 9:02 PM" (#7)
     case 'paused':  status = 'paused'; break;
     case 'done':    status = "time's up"; break;
     default:        status = 'ready';
   }
   if (status !== lastStatus) { el.status.textContent = status; lastStatus = status; }
-  const hintHidden = !soundBlocked();
-  if (el.soundHint.hidden !== hintHidden) el.soundHint.hidden = hintHidden;
 
   el.face.classList.toggle('warn', (state.status === 'running' || state.status === 'paused') && frac <= 0.1);
   el.face.classList.toggle('done', state.status === 'done');
@@ -531,15 +515,7 @@ function lockDownBrowserDefaults() {
   }, { capture: true });
 }
 
-let swallowClick = false;
-
 function bindEvents() {
-  // If sound is blocked while the timer runs (the "click for sound" hint is
-  // showing), the next click only enables sound: it must not also pause the
-  // timer or dismiss the alarm. Decided from what's on screen: by the time a
-  // pointerdown handler runs, the browser already counts the page as clicked.
-  addEventListener('pointerdown', (e) => { swallowClick = e.button === 0 && !el.soundHint.hidden; }, { capture: true });
-
   // Any interaction unlocks audio (needed when started via ?autostart=1).
   for (const type of ['pointerdown', 'keydown']) {
     addEventListener(type, unlockAudio, { capture: true });
@@ -554,7 +530,6 @@ function bindEvents() {
   // controls overlay, which is only as big as the controls it holds (gaps
   // included), so a click meant for a control never toggles the timer.
   document.addEventListener('click', (e) => {
-    if (swallowClick) { swallowClick = false; return; }   // that click only enabled sound
     if (e.button === 0 && !e.target.closest('#controls')) toggle();
   });
   el.startBtn.addEventListener('click', toggle);

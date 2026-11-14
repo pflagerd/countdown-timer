@@ -10,9 +10,9 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
   The hands start at the edge of the central readout instead of at a pivot in the middle, so they never cover the digits.
 - **Digital readout** in the centre of the face (`MM:SS`, or `H:MM:SS` for durations of an hour or more).
 - **Thin progress bar** just below the readout. It is drawn translucent on purpose so it stays in the background.
-- **Status line** showing the wall-clock end time (`ENDS 9:02 PM`), or `PAUSED` / `TIME'S UP`.
+- **Status line** showing the wall-clock end time (`ENDS AT 9:02 PM`), or `PAUSED` / `TIME'S UP`.
 - **Colours:** the face turns amber in the last 10 % and red when time runs out. After that it counts overtime (`+00:04`).
-- **Chime:** made with Web Audio, so there are no audio files. You can mute it. Started with `./countdown`, it plays even if you never touch the window (see "The timer's own Chromium profile" below). If a browser does block sound (e.g. the page opened some other way and never clicked), a **"click for sound"** line appears under the status. That first click only enables sound: it doesn't pause the timer or dismiss the alarm.
+- **Chime:** made with Web Audio, so there are no audio files. You can mute it. Started with `./countdown`, it plays even if you never touch the window (see "The timer's own Chromium profile" below).
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
@@ -185,8 +185,7 @@ tests/             optional Playwright browser tests (see tests/README.md)
 - **Alarm timer:** the alarm is one `setTimeout` scheduled for `endAt`. Chrome's ["intensive" throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88) (one wake-up per minute for hidden pages) applies only to *chained* timers, so a single timeout isn't affected. The visual updates use `requestAnimationFrame`, which pauses while the window is hidden, and resume immediately when it's shown again.
 - **Sound needs a user gesture:** Chrome only lets audio play after a click or key press, or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them; so is the command-line switch `--autoplay-policy=no-user-gesture-required`, which the launcher uses).
   - **What the app does:** any click or key press in the window unlocks audio. When time's up, the app always creates its audio context and tries to play, so the chime sounds whenever the browser allows it.
-  - **When the browser blocks it:** for example the page opened in a normal browser window, or with `COUNTDOWN_PROFILE=none`, and never clicked. The window then shows **"click for sound"**, and the red visual alarm still appears.
-  - **The first click:** it only enables sound; it doesn't pause the timer or dismiss the alarm.
+  - **When the browser blocks it:** for example the page opened in a normal browser window, or with `COUNTDOWN_PROFILE=none`, and never clicked. Then the chime is silent and only the red visual alarm appears. (An earlier version showed a "click for sound" hint in this case; it was removed once the launcher's own profile made the chime work without a click.)
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
 - **Multiple windows:** each window is an independent timer. They share only the remembered duration and mute setting, as of the moment a window opens.
 - **Regenerating icons:** the PNG icons were rendered from the SVGs in `app/icons/` with headless Chromium. If you change the SVGs, re-render them (e.g. `rsvg-convert -w 512 icon.svg > icon-512.png` from `librsvg2-bin`) and bump `VERSION` in `sw.js`.

@@ -19,6 +19,8 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
     // --- timer basics
     p = await open(URL + '?t=0:12&autostart=1'); v = await view(p);
     t.check('?t=0:12&autostart=1 starts; params stripped from URL', v.status.startsWith('ends') && p.url() === URL, `${v.digits} ${p.url()}`);
+    const shown = await p.evaluate(() => { const s = document.getElementById('status'); return { text: s.textContent, upper: getComputedStyle(s).textTransform }; });
+    t.check('#7 status reads "ENDS AT <time>" while running', /^ends at \d{1,2}:\d{2}/.test(shown.text) && shown.upper === 'uppercase', `${shown.text} (${shown.upper})`);
     await sleep(3200); v = await view(p);
     t.check('counts down', v.digits === '00:09' || v.digits === '00:08', v.digits);
     await p.keyboard.press('Space'); const pd = (await view(p)).digits; await sleep(1200); v = await view(p);
