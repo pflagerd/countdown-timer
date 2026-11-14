@@ -3,8 +3,13 @@
 Browser tests for the countdown timer, driven by [Playwright](https://playwright.dev/) (Apache-2.0).
 They're an **optional developer tool**: the app itself has no dependencies, and nothing here is needed to run it.
 
-Each run starts its own `server.js` on a free port, so it doesn't clash with a server you already have
-running on 8765, and every run starts with clean browser storage.
+Every suite runs twice: against the default **file** version (`file://…/app/countdown.html`, what `./countdown` opens)
+and against the **server** version (what `./countdown --server` opens). For the server runs, each suite starts its
+own `server.js` on a free port, so it doesn't clash with a server you already have running on 8765. Every run starts
+with clean browser storage.
+
+To run a single suite in one mode, set `COUNTDOWN_TEST_MODE` to `file` or `server` (the default), e.g.
+`COUNTDOWN_TEST_MODE=file node regress.js`.
 
 ## Setup (once)
 
@@ -34,11 +39,11 @@ running on 8765, and every run starts with clean browser storage.
 
 ## Running
 
-From the `tests/` directory, run the headless suites (about 40 s):
+From the `tests/` directory, run the headless suites in both modes (about 1½ minutes):
 ```bash
 npm test
 ```
-Also run the real app-window suite. It briefly opens real Chromium windows, so it needs a desktop session:
+Also run the suites that open real Chromium windows (`app-window.js`, `launcher-chime.js`). They need a desktop session:
 ```bash
 npm run test:headed
 ```
@@ -51,9 +56,12 @@ To use a different Chromium binary instead of Playwright's own, set `CHROMIUM_PA
 
 | Suite | Checks |
 |---|---|
-| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown**, and the tooltip on disabled controls. **Controls overlay:** hidden until hover or focus, only as big as the controls, clicks outside it start/pause. **Layout:** 10 window sizes. **Offline:** reload served from the service-worker cache. |
+| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown**, and the tooltip on disabled controls. **Controls overlay:** hidden until hover or focus, only as big as the controls, clicks outside it start/pause. **Layout:** 10 window sizes. **Heartbeat:** in server mode, `HEAD manifest.json` every 30 s, answered 200 (using Playwright's fake clock); none in file mode. **Server mode:** reload served from the service-worker cache with the server stopped. **Service worker:** a spy records every `register()` call: exactly one (`sw.js`) in server mode, none in file mode. **Both:** no console warnings or errors. |
+| `sound.js` | The chime, under Chromium's real autoplay rule (normal launch = sound needs a click; `--autoplay-policy=no-user-gesture-required` = allowed). When sound is allowed (as the launcher sets up) it plays at time-up with no click; under the normal rule, started without a click it's blocked (no tones); clicking to start makes it play; mute suppresses it; no "click for sound" hint exists any more. Playwright's reads count as clicks, so the page records a timeline and the test reads it only afterwards. |
 | `lockdown.js` | Right-click, dragging and 23 browser shortcuts are cancelled. The app's own keys, typing in the time fields, Tab, Enter on buttons and the dropdown still work. |
 | `app-window.js` | A real `chromium --app=…` window: #8 end to end (reload keeps the timer; quitting and relaunching gives READY) and `window.close()`. |
+| `launcher.js` | The `./countdown` launcher, with stand-in browsers that record their arguments (no real browser). Checks: file URL by default; `--server` URL; durations; the timer's own profile (location for snap and other Chromium-family browsers, plus the allow-sound and no-first-run switches); `COUNTDOWN_PROFILE` (`none` and a custom folder); percent-encoding of paths with spaces/non-ASCII; error exits; `--help`. `server.js`: polite errors; `--server` starts it with `--exit-when-idle 3m`; with `--exit-when-idle 2s` it stays up while pinged every second, then exits by itself (status 0) about 2 s after the last request. Runs once (not per mode). |
+| `launcher-chime.js` | Headed, end to end: the real launcher starts Chromium (`./countdown 0:05`, and `--server 0:05`); the test only listens to the browser console and never clicks. With the timer's own profile, Chromium must **not** log "The AudioContext was not allowed to start". A control run without that profile must log it, which shows the check can tell the difference. |
 
 **Not covered automatically:** whether Chromium itself skips its shortcuts (`Ctrl+S`, `F5`, …) once the page cancels them.
 Playwright's injected keys never trigger Chromium's own shortcuts, even without the lock-down, so check that by hand

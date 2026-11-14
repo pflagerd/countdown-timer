@@ -5,17 +5,16 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view } = require('./lib');
+const { chromium, sleep, startTarget, launchOptions, reporter, view } = require('./lib');
 
 (async () => {
   if (!process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) {
     console.log('\n== app-window ==\nSKIP  no display (set DISPLAY or WAYLAND_DISPLAY)');
     process.exit(0);
   }
-  const port = await freePort();
-  const URL = `http://localhost:${port}/`;
-  const srv = await startServer(port);
-  const t = reporter('app-window');
+  const target = await startTarget();
+  const { URL } = target;
+  const t = reporter(`app-window [${target.mode}]`);
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'countdown-test-profile-'));
   const launch = (u) => chromium.launchPersistentContext(profile, launchOptions({ headless: false, args: [`--app=${u}`] }));
   const appPage = async (ctx) => {
@@ -44,7 +43,7 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view } 
     t.check('test run completed without exceptions', false, e.message);
   } finally {
     if (ctx) await ctx.close().catch(() => {});
-    srv.kill(); fs.rmSync(profile, { recursive: true, force: true });
+    target.stop(); fs.rmSync(profile, { recursive: true, force: true });
   }
   process.exit(t.finish() ? 1 : 0);
 })();

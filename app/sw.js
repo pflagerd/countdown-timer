@@ -11,11 +11,12 @@
  * Bump VERSION when the asset list changes.
  */
 
-const VERSION = 'v7';
+const VERSION = 'v11';
 const CACHE = `countdown-${VERSION}`;
+// The page itself is precached by name, not as './', so that installing the
+// service worker doesn't depend on the web server mapping '/' to countdown.html.
 const ASSETS = [
-  './',
-  'index.html',
+  'countdown.html',
   'styles.css',
   'app.js',
   'manifest.json',
@@ -52,7 +53,7 @@ self.addEventListener('fetch', (event) => {
       return res;
     } catch (err) {
       const hit = await cache.match(req, { ignoreSearch: true })
-        || (req.mode === 'navigate' ? await cache.match('./') : undefined);
+        || (req.mode === 'navigate' ? (await cache.match('./')) || (await cache.match('countdown.html')) : undefined);
       if (hit) return hit;
       throw err;
     }

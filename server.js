@@ -6,7 +6,14 @@
  * Serves ./app on http://localhost:<port>/ . A service worker requires a
  * "secure context"; http://localhost qualifies, so no TLS is needed.
  *
- * Usage: node server.js [--port 8765] [--bind 127.0.0.1] [--quiet]
+ * Usage: node server.js [--port 8765] [--bind 127.0.0.1] [--quiet] [--exit-when-idle 3m]
+ *
+ * --exit-when-idle is what lets "./countdown --server" clean up after itself:
+ * every open timer window on localhost sends a small request every 30 s (the
+ * heartbeat in app.js), so the server exits once it has heard nothing for the
+ * given time, i.e. a little while after the last timer window was closed.
+ * Without the option the server runs until stopped, which is what you want
+ * anywhere else (e.g. on a VPS).
  */
 
 const http = require('node:http');
@@ -15,6 +22,10 @@ const path = require('node:path');
 const { parseArgs } = require('node:util');
 
 const ROOT = path.join(__dirname, 'app');
+
+// The page served for a directory URL such as http://localhost:8765/ (the
+// app's page is app/countdown.html; there is no index.html).
+const DIRECTORY_INDEX = 'countdown.html';
 
 // Explicit types for everything the app serves; these matter for a PWA.
 const TYPES = {
@@ -37,6 +48,9 @@ Options:
   --port <n>     TCP port (default: 8765)
   --bind <addr>  address to listen on (default: 127.0.0.1, i.e. this machine only)
   --quiet        don't log each request
+  --exit-when-idle <time>
+                 exit after <time> with no requests, e.g. 3m or 90s
+                 (default: never). ./countdown --server uses 3m.
   -h, --help     show this help`;
 
 function parseOptions() {
@@ -47,20 +61,30 @@ function parseOptions() {
         port: { type: 'string', default: '8765' },
         bind: { type: 'string', default: '127.0.0.1' },
         quiet: { type: 'boolean', default: false },
+        'exit-when-idle': { type: 'string' },
         help: { type: 'boolean', short: 'h', default: false },
       },
     }));
   } catch (err) {
-    console.error(`${err.message}\n\n${USAGE}`);
+    console.error(`server.js: sorry, I didn't understand that: ${err.message}\n\n${USAGE}`);
     process.exit(2);
   }
   if (values.help) { console.log(USAGE); process.exit(0); }
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    console.error(`Invalid --port: ${values.port}\n\n${USAGE}`);
+    console.error(`server.js: sorry, --port must be a whole number from 0 to 65535 (I got "${values.port}").\n\n${USAGE}`);
     process.exit(2);
   }
-  return { port, bind: values.bind, quiet: values.quiet };
+  let idleMs = 0;
+  if (values['exit-when-idle'] !== undefined) {
+    const m = /^(\d+)(s|m)?$/.exec(values['exit-when-idle']);
+    idleMs = m ? Number(m[1]) * (m[2] === 'm' ? 60000 : 1000) : 0;
+    if (!idleMs) {
+      console.error(`server.js: sorry, --exit-when-idle needs a time such as 3m or 90s (I got "${values['exit-when-idle']}").\n\n${USAGE}`);
+      process.exit(2);
+    }
+  }
+  return { port, bind: values.bind, quiet: values.quiet, idleMs };
 }
 
 /** Map a request URL to a file under ROOT, or null if it would escape ROOT. */
@@ -91,13 +115,13 @@ function handle(req, res, log) {
   }
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) {
-      // Directory: redirect "/dir" to "/dir/", then serve its index.html.
+      // Directory: redirect "/dir" to "/dir/", then serve its DIRECTORY_INDEX.
       if (!req.url.split('?')[0].endsWith('/')) {
         const [p, q] = req.url.split('?');
         send(res, 301, { Location: p + '/' + (q !== undefined ? '?' + q : '') }, '', isHead);
         return done(301);
       }
-      file = path.join(file, 'index.html');
+      file = path.join(file, DIRECTORY_INDEX);
       return fs.stat(file, (err2, st2) => serveFile(err2, st2));
     }
     serveFile(err, st);
@@ -130,12 +154,20 @@ function handle(req, res, log) {
   }
 }
 
+/** 180000 -> "3m", 90000 -> "90s" (for the log message). */
+function formatIdle(ms) { return ms % 60000 ? `${ms / 1000}s` : `${ms / 60000}m`; }
+
 function main() {
-  const { port, bind, quiet } = parseOptions();
+  const { port, bind, quiet, idleMs } = parseOptions();
   const log = quiet ? () => {} : (msg) => console.log(`${new Date().toISOString()} ${msg}`);
   const server = http.createServer((req, res) => handle(req, res, log));
   server.on('error', (err) => {
-    console.error(`server.js: ${err.message}`);
+    const hint = err.code === 'EADDRINUSE'
+      ? ` Port ${port} is already in use; please stop whatever is using it, or choose another with --port.`
+      : err.code === 'EACCES'
+        ? ` I'm not allowed to use port ${port}; please choose one above 1023 with --port.`
+        : '';
+    console.error(`server.js: sorry, I couldn't start the server (${err.message}).${hint}`);
     process.exit(1);
   });
   server.listen(port, bind, () => {
@@ -144,6 +176,24 @@ function main() {
   const stop = () => { server.close(() => process.exit(0)); server.closeAllConnections(); };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
+
+  if (idleMs) {
+    // Restart the countdown on every request, and also on every bare
+    // connection: the launcher's "is anything listening?" check connects
+    // without sending a request, and counting it gives the window it is about
+    // to open the full idle time to load, so the server can't exit in between.
+    let idleTimer;
+    const stillWanted = () => {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        log(`no requests for ${formatIdle(idleMs)}; stopping`);
+        stop();
+      }, idleMs);
+    };
+    server.on('connection', stillWanted);
+    server.on('request', stillWanted);
+    stillWanted();
+  }
 }
 
 main();

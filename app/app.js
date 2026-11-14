@@ -104,6 +104,13 @@ function writeJSON(storage, key, value) {
   try { storage.setItem(key, JSON.stringify(value)); } catch { /* unavailable: ignore */ }
 }
 
+// The two storage areas are how "closing the window stops the timer" (#8) works:
+// preferences go to localStorage, which lasts until deleted; the running timer
+// goes to sessionStorage, which belongs to this window only. It survives a
+// reload but the browser discards it when the window closes, so no close
+// handler is needed (close events are unreliable after a crash or kill, and a
+// reload fires them too). load() then finds no timer and starts at READY.
+// https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute
 function save() {
   writeJSON(localStorage, PREFS_KEY, { duration: state.duration, muted: state.muted });
   writeJSON(sessionStorage, SESSION_KEY, {
@@ -165,17 +172,36 @@ function beep(t, freq, dur) {
   osc.stop(t + dur + 0.02);
 }
 
-function chime() {
-  if (state.muted || !audioCtx || audioCtx.state !== 'running') return;
+function playChime() {
   const t = audioCtx.currentTime + 0.02;
   beep(t, 880, 0.16);
   beep(t + 0.2, 880, 0.16);
   beep(t + 0.4, 1175, 0.28);
 }
 
+let resumePending = false;
+function chime() {
+  if (state.muted || !audioCtx) return;
+  if (audioCtx.state === 'running') { playChime(); return; }
+  // Suspended (no click yet): try to start it anyway. This succeeds when the
+  // browser allows sound without a click, e.g. Chromium started by ./countdown
+  // (--autoplay-policy=no-user-gesture-required); Chrome may also allow it on
+  // its own (https://developer.chrome.com/blog/autoplay). Otherwise the
+  // promise waits until a click/key press resumes the context.
+  if (resumePending) return;
+  resumePending = true;
+  audioCtx.resume()
+    .then(() => { if (!state.muted && state.status === 'done' && audioCtx.state === 'running') playChime(); })
+    .catch(() => {})
+    .finally(() => { resumePending = false; });
+}
+
 let alarmTimer = 0;
 function startAlarm() {
   stopAlarm();
+  // The timer may have been started without any click (./countdown 25m), in
+  // which case no AudioContext exists yet: create one now and try to play.
+  if (!state.muted) unlockAudio();
   let n = 0;
   const ring = () => {
     chime();
@@ -366,7 +392,7 @@ function render(now = Date.now()) {
 
   let status;
   switch (state.status) {
-    case 'running': status = `ends ${endTimeFmt.format(state.endAt)}`; break;
+    case 'running': status = `ends at ${endTimeFmt.format(state.endAt)}`; break;   // shown upper-case: "ENDS AT 9:02 PM" (#7)
     case 'paused':  status = 'paused'; break;
     case 'done':    status = "time's up"; break;
     default:        status = 'ready';
@@ -521,7 +547,7 @@ function bindEvents() {
   document.addEventListener('fullscreenchange', syncFullscreenButton);
   addEventListener('resize', fitToWindow);
 
-  // Preset dropdown (options are listed in index.html).
+  // Preset dropdown (options are listed in countdown.html).
   el.presetSelect.addEventListener('change', () => {
     const min = Number(el.presetSelect.value);
     el.presetSelect.value = '';          // back to "Preset…" so the same choice works again
@@ -602,9 +628,33 @@ function boot() {
   ensureLoop();
   render();
 
-  if ('serviceWorker' in navigator) {
+  // The offline cache (service worker) only exists when served over http(s),
+  // i.e. `./countdown --server`. Opened straight from a file (the default),
+  // browsers don't allow service workers, and the files are local anyway.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
   }
+  startHeartbeat();
 }
 
+// Heartbeat: "./countdown --server" starts server.js with --exit-when-idle 3m,
+// so the server keeps running only while a timer window is open. Each window
+// therefore asks the server for a tiny response every 30 s. Only on localhost:
+// a file:// page has no server, and a hosted copy (e.g. a VPS) doesn't need it.
+// - HEAD of an existing file gets 200 from any server, so nothing is logged as
+//   an error; sw.js passes HEAD straight to the network (it caches GET only), and
+//   "no-store" bypasses the browser's HTTP cache, so the request really arrives.
+// - 30 s, not 60 s: Chrome may delay timers in a hidden window to about once
+//   a minute, which still leaves a wide margin below the server's 3 minutes.
+// - Failures are ignored: if the server is gone, the page carries on (a reload
+//   is served from the service worker's cache).
+const HEARTBEAT_MS = 30000;
+function startHeartbeat() {
+  if (!/^https?:$/.test(location.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return;
+  const beat = () => fetch('manifest.json', { method: 'HEAD', cache: 'no-store' }).catch(() => {});
+  setInterval(beat, HEARTBEAT_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+}
+
+// Entry point: countdown.html loads this file with "defer", so the browser runs it once the page is built; boot() is the equivalent of main(), and everything after it is driven by events.
 boot();

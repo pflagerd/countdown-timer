@@ -1,32 +1,79 @@
 #!/usr/bin/env bash
 # Launch the countdown timer in a chrome-less (app-mode) Chromium window.
 #
-# Usage:  ./countdown            # open the timer
-#         ./countdown 25m        # open, set 25 minutes and start immediately
-#         ./countdown 1h30m      # also: 90s, 5:00, 1:30:00, 10 (= minutes)
+# Usage:  ./countdown [--server] [DURATION]
+#
+#   ./countdown              open the timer straight from app/countdown.html (no server)
+#   ./countdown 25m          ...and set 25 minutes and start immediately
+#   ./countdown --server     serve app/ with server.js (Node.js) on http://localhost
+#                            instead; this is the version Chrome can install as an app.
+#                            The server stops by itself about 3 minutes after the
+#                            last timer window closes.
+#   ./countdown --server 25m
+#
+#   DURATION: 25m, 1h30m, 90s, 5:00, 1:30:00, or a bare number of minutes (10).
+#
+# The timer runs in its own Chromium profile, started with sound allowed
+# without a click, so the chime plays even if you never touch the window.
 #
 # Environment overrides:
-#   COUNTDOWN_PORT     port for the local server          (default 8765)
 #   COUNTDOWN_BROWSER  browser executable to use           (default: first found)
 #   COUNTDOWN_SIZE     initial window size, WIDTH,HEIGHT   (default 420,420)
+#   COUNTDOWN_PORT     port for --server                   (default 8765)
+#   COUNTDOWN_PROFILE  Chromium profile folder for the timer, or "none" to use
+#                      your normal profile (default: see README)
 set -euo pipefail
 
+# usage() prints this script’s own header comment as the help text, so the help and the comment can never drift apart
+usage() { sed -n '2,/^set -euo/{/^#/p}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
 here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
-port=${COUNTDOWN_PORT:-8765}
 size=${COUNTDOWN_SIZE:-420,420}
-url="http://localhost:${port}/"
-if [[ $# -gt 0 ]]; then
-  url+="?t=$(printf '%s' "$1" | sed 's/[^0-9a-zA-Z:.]//g')&autostart=1"
+port=${COUNTDOWN_PORT:-8765}
+
+server=0
+duration=
+for arg in "$@"; do
+  case $arg in
+    --server)  server=1 ;;
+    -h|--help) usage; exit 0 ;;
+    -*)        echo "countdown: sorry, I don't recognise the option \"$arg\". Here is what I understand:" >&2; echo >&2; usage >&2; exit 2 ;;
+    *)         [[ -z $duration ]] || { echo "countdown: sorry, please give just one duration (I got \"$duration\" and \"$arg\")." >&2; exit 2; }
+               duration=$arg ;;
+  esac
+done
+
+# Percent-encode a filesystem path for use in a file:// URL (keeps / and safe characters).
+urlencode_path() {
+  local LC_ALL=C s=$1 out= c i
+  for (( i = 0; i < ${#s}; i++ )); do
+    c=${s:i:1}
+    case $c in
+      [A-Za-z0-9/._~-]) out+=$c ;;
+      *) printf -v c '%%%02X' "'$c"; out+=$c ;;
+    esac
+  done
+  printf '%s' "$out"
+}
+
+if (( server )); then
+  url="http://localhost:${port}/"
+  port_open() { (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; }  # /dev/tcp/HOST/PORT isn't a real file. It's a bash feature: opening that "path" makes bash try a TCP connection to that host and port (https://www.gnu.org/software/bash/manual/bash.html#Redirections)
+  # Start the server in the background if nothing is listening yet. With
+  # --exit-when-idle it stops by itself about 3 minutes after the last timer
+  # window closes (each open window pings it every 30 s; see app.js).
+  if ! port_open; then
+    command -v node >/dev/null 2>&1 || { echo "countdown: sorry, --server needs Node.js, which I couldn't find. Please install it (Kubuntu: sudo apt install nodejs; Fedora: sudo dnf install nodejs), or run ./countdown without --server." >&2; exit 1; }
+    nohup node "${here}/server.js" --port "${port}" --quiet --exit-when-idle 3m >/dev/null 2>&1 &
+    for _ in $(seq 1 30); do port_open && break; sleep 0.1; done
+    port_open || { echo "countdown: sorry, the server didn't start on port ${port}. Please try again, or choose another port with COUNTDOWN_PORT (e.g. COUNTDOWN_PORT=8766 ./countdown --server)." >&2; exit 1; }
+  fi
+else
+  url="file://$(urlencode_path "${here}/app/countdown.html")"
 fi
 
-port_open() { (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; }
-
-# Start the server in the background if nothing is listening yet.
-if ! port_open; then
-  command -v node >/dev/null 2>&1 || { echo "countdown: Node.js not found; install it (e.g. sudo apt install nodejs)" >&2; exit 1; }
-  nohup node "${here}/server.js" --port "${port}" --quiet >/dev/null 2>&1 &
-  for _ in $(seq 1 30); do port_open && break; sleep 0.1; done
-  port_open || { echo "countdown: server failed to start on port ${port}" >&2; exit 1; }
+if [[ -n $duration ]]; then
+  url+="?t=$(printf '%s' "$duration" | sed 's/[^0-9a-zA-Z:.]//g')&autostart=1"
 fi
 
 browser=${COUNTDOWN_BROWSER:-}
@@ -35,6 +82,34 @@ if [[ -z $browser ]]; then
     if command -v "$b" >/dev/null 2>&1; then browser=$b; break; fi
   done
 fi
-[[ -n $browser ]] || { echo "countdown: no Chromium-family browser found; set COUNTDOWN_BROWSER" >&2; exit 1; }
+[[ -n $browser ]] || { echo "countdown: sorry, no Chromium-family browser found; please set COUNTDOWN_BROWSER" >&2; exit 1; }
 
-exec "$browser" --app="${url}" --window-size="${size}" >/dev/null 2>&1
+# The timer's own Chromium profile. A separate profile means a separate
+# Chromium process, so the switches below take effect even if Chromium is
+# already open with your normal profile. A snap Chromium (Kubuntu's default)
+# can't write to hidden folders like ~/.local, so it gets a folder inside the
+# snap's own area instead.
+profile=${COUNTDOWN_PROFILE:-}
+if [[ -z $profile ]]; then
+  # /snap/bin/<name> is a link to /usr/bin/snap, so check both the path found
+  # on PATH and what it resolves to.
+  browser_cmd=$(command -v "$browser" || printf '%s' "$browser")
+  browser_real=$(readlink -f "$browser_cmd" 2>/dev/null || printf '%s' "$browser_cmd")
+  if [[ $browser_cmd == /snap/bin/* || $browser_real == */bin/snap || $browser_real == /snap/* ]]; then
+    profile="$HOME/snap/$(basename "$browser_cmd")/common/countdown-timer-profile"
+  else
+    profile="${XDG_DATA_HOME:-$HOME/.local/share}/countdown-timer/chromium-profile"
+  fi
+fi
+
+args=(--app="${url}" --window-size="${size}")
+if [[ $profile != none ]]; then
+  mkdir -p "$profile"
+  args+=(
+    --user-data-dir="$profile"
+    --autoplay-policy=no-user-gesture-required   # chime without a click
+    --no-first-run --no-default-browser-check    # no welcome / default-browser prompts in the new profile
+  )
+fi
+
+exec "$browser" "${args[@]}" >/dev/null 2>&1

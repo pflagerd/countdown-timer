@@ -1,15 +1,17 @@
 'use strict';
-// Functional, layout, #8 (closing stops the timer) and offline checks. Headless.
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, revealControls } = require('./lib');
+// Functional, layout, #8 (closing stops the timer) and offline / file-mode checks. Headless.
+// Runs against server.js (default) or the file:// version (COUNTDOWN_TEST_MODE=file).
+const { chromium, sleep, startTarget, launchOptions, reporter, view, revealControls } = require('./lib');
 
 (async () => {
-  const port = await freePort();
-  const URL = `http://localhost:${port}/`;
-  let srv = await startServer(port);
-  const t = reporter('regress');
+  const target = await startTarget();
+  const { URL } = target;
+  const t = reporter(`regress [${target.mode}]`);
   const b = await chromium.launch(launchOptions());
   const ctx = await b.newContext({ viewport: { width: 420, height: 420 } });
   const errs = []; ctx.on('weberror', (e) => errs.push(String(e.error())));
+  const consoleMsgs = [];
+  ctx.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') consoleMsgs.push(`${m.type()}: ${m.text().split('\n')[0]}`); });
   const open = async (u = URL) => { const p = await ctx.newPage(); await p.goto(u); await sleep(250); return p; };
   try {
     let p, v;
@@ -17,6 +19,8 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, r
     // --- timer basics
     p = await open(URL + '?t=0:12&autostart=1'); v = await view(p);
     t.check('?t=0:12&autostart=1 starts; params stripped from URL', v.status.startsWith('ends') && p.url() === URL, `${v.digits} ${p.url()}`);
+    const shown = await p.evaluate(() => { const s = document.getElementById('status'); return { text: s.textContent, upper: getComputedStyle(s).textTransform }; });
+    t.check('#7 status reads "ENDS AT <time>" while running', /^ends at \d{1,2}:\d{2}/.test(shown.text) && shown.upper === 'uppercase', `${shown.text} (${shown.upper})`);
     await sleep(3200); v = await view(p);
     t.check('counts down', v.digits === '00:09' || v.digits === '00:08', v.digits);
     await p.keyboard.press('Space'); const pd = (await view(p)).digits; await sleep(1200); v = await view(p);
@@ -148,16 +152,85 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, r
     }
     t.check('layout: no scroll bars, clock fully visible and >= 200px, controls inside the clock (10 sizes)', bad.length === 0, bad.join(' ') || 'ok');
 
-    // --- offline: server stopped, reload served from the service-worker cache
-    await p.setViewportSize({ width: 420, height: 420 }); await p.goto(URL);
-    await p.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
-    srv.kill(); srv = null; await sleep(400);
-    const r = await p.reload().catch(() => null);
-    t.check('offline: reload served from the service-worker cache (HTTP 200)', !!r && r.status() === 200, r && r.status());
+    await p.setViewportSize({ width: 420, height: 420 });
+
+    // --- heartbeat: on localhost, each window sends HEAD manifest.json every 30 s so that
+    //     "server.js --exit-when-idle" keeps running while a window is open; never on file://.
+    //     Playwright's fake clock runs 61 s of the page's timers in an instant.
+    {
+      const hp = await ctx.newPage();
+      await hp.clock.install();
+      const beats = [];
+      hp.on('response', (r) => { if (r.request().method() === 'HEAD') beats.push(`${r.status()} ${new globalThis.URL(r.url()).pathname}`); });
+      await hp.goto(URL); await sleep(300);
+      await hp.clock.runFor(61000); await sleep(500);
+      await hp.close();
+      if (target.mode === 'server') {
+        t.check('heartbeat: HEAD manifest.json every 30 s (2 in 61 s), answered 200', beats.length === 2 && beats.every((b) => b === '200 /manifest.json'), beats.join(', ') || 'none');
+      } else {
+        t.check('heartbeat: none in file mode (no server to keep alive)', beats.length === 0, beats.join(', ') || 'none');
+      }
+    }
+
+    // --- service worker registration: a spy, installed before app.js runs, records every
+    //     navigator.serviceWorker.register() call. File mode must make none (browsers refuse
+    //     service workers on file://, so app.js must not even try). Server mode must make
+    //     exactly one, for sw.js, which also shows the spy really sees calls.
+    //     (Asking getRegistrations() instead can't tell: on file:// it always throws.)
+    {
+      const sp = await ctx.newPage();
+      await sp.addInitScript(() => {
+        window.__swRegisterCalls = [];
+        const orig = ServiceWorkerContainer.prototype.register;
+        ServiceWorkerContainer.prototype.register = function (url, ...rest) {
+          window.__swRegisterCalls.push(String(url));
+          return orig.call(this, url, ...rest);
+        };
+      });
+      await sp.goto(URL); await sleep(500);
+      const calls = await sp.evaluate(() => window.__swRegisterCalls);
+      await sp.close();
+      if (target.mode === 'server') {
+        t.check('server mode: app.js registers the service worker once (sw.js)', calls.length === 1 && calls[0] === 'sw.js', JSON.stringify(calls));
+      } else {
+        t.check('file mode: app.js never calls serviceWorker.register()', calls.length === 0, JSON.stringify(calls));
+      }
+    }
+
+    if (target.mode === 'server') {
+      // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
+      //     shortcuts point at it by name (so they also work on servers without that default)
+      // Fetched from the test (Node), not the page: the deliberate index.html 404 would
+      // otherwise show up as a console error in the page.
+      const pages = await (async (base) => {
+        const isApp = async (u) => { const r = await fetch(u); return r.ok && (await r.text()).includes('id="face"'); };
+        const m = await (await fetch(new globalThis.URL('manifest.json', base))).json();
+        const resolve = (u) => new globalThis.URL(u, new globalThis.URL('manifest.json', base)).href;
+        return {
+          root: await isApp(base),
+          byName: await isApp(new globalThis.URL('countdown.html', base)),
+          noIndexHtml: (await fetch(new globalThis.URL('index.html', base))).status,
+          startUrl: m.start_url, start: await isApp(resolve(m.start_url)),
+          shortcuts: await Promise.all(m.shortcuts.map((s) => isApp(resolve(s.url)))),
+          id: m.id,
+        };
+      })(URL);
+      t.check('"/" serves the app page (countdown.html); there is no index.html', pages.root && pages.byName && pages.noIndexHtml === 404, JSON.stringify(pages));
+      t.check('manifest start_url and both shortcuts point at countdown.html and load', pages.startUrl === './countdown.html' && pages.start && pages.shortcuts.length === 2 && pages.shortcuts.every(Boolean), JSON.stringify(pages));
+      t.check('manifest id unchanged ("./"), so an installed copy stays the same app', pages.id === './', pages.id);
+
+      // --- offline: server stopped, reload served from the service-worker cache
+      await p.goto(URL);
+      await p.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
+      target.stop(); await sleep(400);
+      const r = await p.reload().catch(() => null);
+      t.check('offline: reload served from the service-worker cache (HTTP 200)', !!r && r.status() === 200, r && r.status());
+    }
+    t.check('no console warnings or errors during the run', consoleMsgs.length === 0, consoleMsgs.slice(0, 3).join(' | ') || 'none');
   } catch (e) {
     t.check('test run completed without exceptions', false, e.message);
   } finally {
-    await b.close(); if (srv) srv.kill();
+    await b.close(); target.stop();
   }
   process.exit(t.finish(errs) ? 1 : 0);
 })();

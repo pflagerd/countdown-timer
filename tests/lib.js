@@ -1,14 +1,16 @@
 'use strict';
 /*
  * Shared helpers for the countdown-timer tests.
- * Each run starts its own server.js on a free port, so it never collides with a
- * server you already have running (and every run gets fresh browser storage,
- * because storage is per origin and the port is part of the origin).
+ * In server mode each run starts its own server.js on a free port, so it never
+ * collides with a server you already have running (and every run gets fresh
+ * browser storage, because storage is per origin and the port is part of the
+ * origin). In file mode the app is opened straight from app/countdown.html.
  */
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
 const net = require('net');
 const path = require('path');
+const { pathToFileURL } = require('url');
 
 const ROOT = path.resolve(__dirname, '..');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -80,4 +82,18 @@ async function revealControls(page) {
   await page.hover('#face', { position: { x: 10, y: 10 } }); await sleep(250);
 }
 
-module.exports = { chromium, ROOT, sleep, freePort, startServer, launchOptions, reporter, view, revealControls };
+/**
+ * What to test: COUNTDOWN_TEST_MODE=server (default) starts server.js on a free
+ * port and returns its http://localhost URL; COUNTDOWN_TEST_MODE=file returns
+ * the file:// URL of app/countdown.html (the launcher's default mode), no server.
+ */
+async function startTarget() {
+  if (process.env.COUNTDOWN_TEST_MODE === 'file') {
+    return { mode: 'file', URL: pathToFileURL(path.join(ROOT, 'app', 'countdown.html')).href, srv: null, stop() {} };
+  }
+  const port = await freePort();
+  const srv = await startServer(port);
+  return { mode: 'server', URL: `http://localhost:${port}/`, srv, stop() { srv.kill(); } };
+}
+
+module.exports = { chromium, ROOT, sleep, freePort, startServer, startTarget, launchOptions, reporter, view, revealControls };
