@@ -3,7 +3,7 @@
   "short_name": "Countdown",
   "description": "A chrome-less countdown timer with an analog face and digital readout.",
   "id": "./",
-  "start_url": "./",
+  "start_url": "./countdown.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0e1116",
@@ -15,7 +15,7 @@
     { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "5 minutes",  "url": "./?t=5m&autostart=1" },
-    { "name": "25 minutes", "url": "./?t=25m&autostart=1" }
+    { "name": "5 minutes",  "url": "./countdown.html?t=5m&autostart=1" },
+    { "name": "25 minutes", "url": "./countdown.html?t=25m&autostart=1" }
   ]
 }

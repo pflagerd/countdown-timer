@@ -47,7 +47,7 @@ No build step, no npm packages, no frameworks. By default the only requirement i
 ./countdown
 ```
 
-That's all. The script opens the timer **straight from `app/index.html`** in an app-mode window, which has no tabs, address bar or toolbar. No server is involved.
+That's all. The script opens the timer **straight from `app/countdown.html`** in an app-mode window, which has no tabs, address bar or toolbar. No server is involved.
 
 ```bash
 ./countdown 25m
@@ -61,7 +61,7 @@ Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30
 
 | | `./countdown` (default) | `./countdown --server` |
 |---|---|---|
-| Opens | `file://…/app/index.html` | `http://localhost:8765/`, served by `server.js` |
+| Opens | `file://…/app/countdown.html` | `http://localhost:8765/`, served by `server.js` |
 | Needs | only Chromium | Chromium and Node.js |
 | Installable as a Chrome app | No: Chrome only installs apps served over HTTPS or `localhost` ([install criteria](https://web.dev/articles/install-criteria)) | Yes (see below) |
 | Offline cache (service worker) | Not used; the files are already local, and browsers don't allow service workers on `file://` | Yes |
@@ -100,7 +100,7 @@ Environment overrides for `./countdown`:
 Default (file) mode, e.g. with snap Chromium:
 
 ```bash
-chromium --app=file:///path/to/countdown-timer/app/index.html --window-size=420,420 \
+chromium --app=file:///path/to/countdown-timer/app/countdown.html --window-size=420,420 \
   --user-data-dir="$HOME/snap/chromium/common/countdown-timer-profile" \
   --autoplay-policy=no-user-gesture-required --no-first-run --no-default-browser-check
 ```
@@ -128,6 +128,13 @@ node server.js --port 8765 --quiet
 - `--quiet` stops per-request logging. `--help` lists the options.
 
 `server.js` is a small static file server built only on Node's built-in [`http`](https://nodejs.org/api/http.html) and [`fs`](https://nodejs.org/api/fs.html) modules (no npm packages). It serves `app/` with explicit file types and a `Cache-Control: no-cache` header, so edits show up on the next reload. It supports `If-Modified-Since`, refuses paths that would escape `app/`, and answers only `GET` and `HEAD`.
+
+**The page is `app/countdown.html` (there is no `index.html`).**
+- **`server.js`** serves it for the folder address, so `http://localhost:8765/` works.
+- **The manifest's `start_url` and shortcuts** name `countdown.html` explicitly.
+- **The service worker** pre-caches it by name.
+
+So the app installs and works offline even on another web server (e.g. a VPS) that doesn't treat `countdown.html` as its default page. Visitors there would just need the `/countdown.html` address, unless you set that server's default page.
 
 ```bash
 chromium --app=http://localhost:8765/ --window-size=420,420
@@ -171,10 +178,10 @@ The page also accepts URL parameters: `http://localhost:8765/?t=25m&autostart=1`
 ## Layout
 
 ```
-countdown          launcher (bash): opens app/index.html in an app-mode window; --server starts server.js and uses http://localhost
+countdown          launcher (bash): opens app/countdown.html in an app-mode window; --server starts server.js and uses http://localhost
 server.js          static file server for ./app (Node.js built-in modules only)
 app/
-  index.html       markup: SVG face + HTML readout overlaid in its centre
+  countdown.html   markup: SVG face + HTML readout overlaid in its centre
   styles.css       theming via CSS custom properties; sizes use container-query units
   app.js           state machine, rendering, audio, wake lock, persistence
   sw.js            service worker (network-first, cache fallback)

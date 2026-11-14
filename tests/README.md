@@ -3,7 +3,7 @@
 Browser tests for the countdown timer, driven by [Playwright](https://playwright.dev/) (Apache-2.0).
 They're an **optional developer tool**: the app itself has no dependencies, and nothing here is needed to run it.
 
-Every suite runs twice: against the default **file** version (`file://…/app/index.html`, what `./countdown` opens)
+Every suite runs twice: against the default **file** version (`file://…/app/countdown.html`, what `./countdown` opens)
 and against the **server** version (what `./countdown --server` opens). For the server runs, each suite starts its
 own `server.js` on a free port, so it doesn't clash with a server you already have running on 8765. Every run starts
 with clean browser storage.

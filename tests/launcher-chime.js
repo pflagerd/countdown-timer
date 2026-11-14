@@ -41,7 +41,7 @@ const BLOCKED = /AudioContext was not allowed to start/;
     let browser, page;
     for (let i = 0; i < 100 && !browser; i++) { try { browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`); } catch { await sleep(100); } }
     if (!browser) return { error: 'could not attach to the browser' };
-    for (let i = 0; i < 100 && !page; i++) { page = browser.contexts().flatMap((c) => c.pages()).find((p) => /index\.html|localhost/.test(p.url())); if (!page) await sleep(100); }
+    for (let i = 0; i < 100 && !page; i++) { page = browser.contexts().flatMap((c) => c.pages()).find((p) => /countdown\.html|localhost/.test(p.url())); if (!page) await sleep(100); }
     if (!page) { await browser.close().catch(() => {}); return { error: 'timer window not found' }; }
     const msgs = [];
     page.on('console', (m) => msgs.push(m.text()));

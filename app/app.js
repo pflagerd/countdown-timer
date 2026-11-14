@@ -539,7 +539,7 @@ function bindEvents() {
   document.addEventListener('fullscreenchange', syncFullscreenButton);
   addEventListener('resize', fitToWindow);
 
-  // Preset dropdown (options are listed in index.html).
+  // Preset dropdown (options are listed in countdown.html).
   el.presetSelect.addEventListener('change', () => {
     const min = Number(el.presetSelect.value);
     el.presetSelect.value = '';          // back to "Preset…" so the same choice works again

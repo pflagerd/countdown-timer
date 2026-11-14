@@ -37,13 +37,13 @@ function run(args, env = {}) {
   return { code: r.status, out: (r.stdout || '') + (r.stderr || ''), browserArgs };
 }
 const has = (r, a) => r.browserArgs.includes(a);
-const fileURL = pathToFileURL(path.join(ROOT, 'app', 'index.html')).href;
+const fileURL = pathToFileURL(path.join(ROOT, 'app', 'countdown.html')).href;
 const ownProfile = `--user-data-dir=${path.join(home, '.local', 'share', 'countdown-timer', 'chromium-profile')}`;
 
 (async () => {
 try {
   let r = run([]);
-  t.check('default: opens app/index.html from disk', r.code === 0 && has(r, `--app=${fileURL}`), r.browserArgs[0]);
+  t.check('default: opens app/countdown.html from disk', r.code === 0 && has(r, `--app=${fileURL}`), r.browserArgs[0]);
   t.check('default: window size 420,420', has(r, '--window-size=420,420'));
   t.check("default: the timer's own profile under ~/.local/share", has(r, ownProfile), r.browserArgs.find((a) => a.startsWith('--user-data-dir')));
   t.check('default: sound allowed without a click', has(r, '--autoplay-policy=no-user-gesture-required'));
@@ -79,7 +79,7 @@ try {
   try { fs.unlinkSync(argsFile); } catch { /* none */ }
   spawnSync(path.join(spaced, 'countdown'), ['5m'], { env: { HOME: home, PATH: process.env.PATH, COUNTDOWN_BROWSER: fake } });
   const spacedArgs = fs.existsSync(argsFile) ? fs.readFileSync(argsFile, 'utf8').split('\n') : [];
-  t.check('folder with a space and ü: URL is percent-encoded', spacedArgs[0] === `--app=${pathToFileURL(path.join(spaced, 'app', 'index.html')).href}?t=5m&autostart=1`, spacedArgs[0]);
+  t.check('folder with a space and ü: URL is percent-encoded', spacedArgs[0] === `--app=${pathToFileURL(path.join(spaced, 'app', 'countdown.html')).href}?t=5m&autostart=1`, spacedArgs[0]);
 
   r = run(['--bogus']);
   t.check('unknown option: exit 2 with a polite message and the usage', r.code === 2 && /sorry, I don't recognise the option "--bogus"/.test(r.out) && /Usage:/.test(r.out), r.out.split('\n')[0]);

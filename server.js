@@ -16,6 +16,10 @@ const { parseArgs } = require('node:util');
 
 const ROOT = path.join(__dirname, 'app');
 
+// The page served for a directory URL such as http://localhost:8765/ (the
+// app's page is app/countdown.html; there is no index.html).
+const DIRECTORY_INDEX = 'countdown.html';
+
 // Explicit types for everything the app serves; these matter for a PWA.
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -91,13 +95,13 @@ function handle(req, res, log) {
   }
   fs.stat(file, (err, st) => {
     if (!err && st.isDirectory()) {
-      // Directory: redirect "/dir" to "/dir/", then serve its index.html.
+      // Directory: redirect "/dir" to "/dir/", then serve its DIRECTORY_INDEX.
       if (!req.url.split('?')[0].endsWith('/')) {
         const [p, q] = req.url.split('?');
         send(res, 301, { Location: p + '/' + (q !== undefined ? '?' + q : '') }, '', isHead);
         return done(301);
       }
-      file = path.join(file, 'index.html');
+      file = path.join(file, DIRECTORY_INDEX);
       return fs.stat(file, (err2, st2) => serveFile(err2, st2));
     }
     serveFile(err, st);

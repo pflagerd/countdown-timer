@@ -4,7 +4,7 @@
  * In server mode each run starts its own server.js on a free port, so it never
  * collides with a server you already have running (and every run gets fresh
  * browser storage, because storage is per origin and the port is part of the
- * origin). In file mode the app is opened straight from app/index.html.
+ * origin). In file mode the app is opened straight from app/countdown.html.
  */
 const { chromium } = require('playwright');
 const { spawn } = require('child_process');
@@ -85,11 +85,11 @@ async function revealControls(page) {
 /**
  * What to test: COUNTDOWN_TEST_MODE=server (default) starts server.js on a free
  * port and returns its http://localhost URL; COUNTDOWN_TEST_MODE=file returns
- * the file:// URL of app/index.html (the launcher's default mode), no server.
+ * the file:// URL of app/countdown.html (the launcher's default mode), no server.
  */
 async function startTarget() {
   if (process.env.COUNTDOWN_TEST_MODE === 'file') {
-    return { mode: 'file', URL: pathToFileURL(path.join(ROOT, 'app', 'index.html')).href, srv: null, stop() {} };
+    return { mode: 'file', URL: pathToFileURL(path.join(ROOT, 'app', 'countdown.html')).href, srv: null, stop() {} };
   }
   const port = await freePort();
   const srv = await startServer(port);
