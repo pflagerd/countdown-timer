@@ -38,7 +38,7 @@ tests/             Playwright suites (optional dev tool; see tests/README.md)
 
 Every exchange with the owner is logged as **one comment on issue #10**.
 - Exchanges 1–96 are on #2 (now closed); 1–37 were first on PR #9.
-- **The next exchange number is 101.**
+- **The next exchange number is 102.**
 
 Format of each comment:
 ```
