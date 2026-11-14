@@ -93,7 +93,8 @@ Environment overrides for `./countdown`:
 - **Separate saved settings:** the remembered duration and mute setting live in this profile, apart from your normal browser.
 - **To reset it:** close the timer and delete the folder.
 - **Installing (`--server`):** if you install the app from a window opened by `./countdown --server`, it's installed into this profile. To install it into your normal Chromium, open `http://localhost:8765/` there (with `./countdown --server` or `node server.js` running), or run `COUNTDOWN_PROFILE=none ./countdown --server`.
-- **Checked here:** on Xvfb, with the timer started by the real launcher and never clicked, Chromium did **not** block the chime in either mode. Without this profile (the control), it did. The snap location and Chromium 157 on your desktop are not yet confirmed.
+- **Checked here:** on Xvfb, with the timer started by the real launcher and never clicked, Chromium did **not** block the chime in either mode. Without this profile (the control), it did. Also confirmed by hand on Kubuntu (Chromium 157 snap, so the profile in `~/snap/chromium/common/`): the chime played without a click in both modes.
+- **Not covered: the app installed in Chromium and opened from the KDE menu.** That isn't started by `./countdown`, so it doesn't get the allow-sound switch, and I expect the chime then needs a click. Chrome's autoplay page lists installing as an exception only on mobile. This hasn't been tested.
 
 ### What the launcher actually runs
 

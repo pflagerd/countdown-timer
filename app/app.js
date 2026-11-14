@@ -184,8 +184,9 @@ function chime() {
   if (state.muted || !audioCtx) return;
   if (audioCtx.state === 'running') { playChime(); return; }
   // Suspended (no click yet): try to start it anyway. This succeeds when the
-  // browser allows sound without a click (e.g. an installed app, or Chromium
-  // started with --autoplay-policy=no-user-gesture-required); otherwise the
+  // browser allows sound without a click, e.g. Chromium started by ./countdown
+  // (--autoplay-policy=no-user-gesture-required); Chrome may also allow it on
+  // its own (https://developer.chrome.com/blog/autoplay). Otherwise the
   // promise waits until a click/key press resumes the context.
   if (resumePending) return;
   resumePending = true;
