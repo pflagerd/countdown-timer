@@ -23,6 +23,7 @@
     <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/></symbol>
     <symbol id="i-muted" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5"/></symbol>
     <symbol id="i-fs" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></symbol>
+    <symbol id="i-install" viewBox="0 0 24 24"><path d="M12 4v10.5M8 10.5l4 4 4-4"/><path d="M5 16.5V19h14v-2.5"/></symbol>
     <symbol id="i-fs-exit" viewBox="0 0 24 24"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/></symbol>
   </svg>
 
@@ -78,6 +79,8 @@
           <button class="icon" id="resetBtn" title="Reset (R / Esc)" aria-label="Reset"><svg aria-hidden="true"><use href="#i-reset"/></svg></button>
           <button class="icon" id="muteBtn" title="Mute (M)" aria-label="Mute" aria-pressed="false"><svg aria-hidden="true"><use href="#i-sound"/></svg></button>
           <button class="icon" id="fsBtn" title="Fullscreen (F)" aria-label="Fullscreen"><svg aria-hidden="true"><use href="#i-fs"/></svg></button>
+          <!-- Hidden unless the browser says the page can be installed and isn't yet; see "install" in app.js. -->
+          <button class="icon" id="installBtn" title="Install as an app" aria-label="Install as an app" hidden><svg aria-hidden="true"><use href="#i-install"/></svg></button>
         </div>
       </div>
     </div>
