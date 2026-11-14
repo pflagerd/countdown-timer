@@ -56,7 +56,7 @@ urlencode_path() {
 
 if (( server )); then
   url="http://localhost:${port}/"
-  port_open() { (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; }
+  port_open() { (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; }  # /dev/tcp/HOST/PORT isn't a real file. It's a bash feature: opening that "path" makes bash try a TCP connection to that host and port (https://www.gnu.org/software/bash/manual/bash.html#Redirections)
   # Start the server in the background if nothing is listening yet.
   if ! port_open; then
     command -v node >/dev/null 2>&1 || { echo "countdown: --server needs Node.js; install it (e.g. sudo apt install nodejs)" >&2; exit 1; }
