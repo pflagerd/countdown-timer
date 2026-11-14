@@ -40,6 +40,7 @@ const has = (r, a) => r.browserArgs.includes(a);
 const fileURL = pathToFileURL(path.join(ROOT, 'app', 'index.html')).href;
 const ownProfile = `--user-data-dir=${path.join(home, '.local', 'share', 'countdown-timer', 'chromium-profile')}`;
 
+(async () => {
 try {
   let r = run([]);
   t.check('default: opens app/index.html from disk', r.code === 0 && has(r, `--app=${fileURL}`), r.browserArgs[0]);
@@ -81,17 +82,44 @@ try {
   t.check('folder with a space and ü: URL is percent-encoded', spacedArgs[0] === `--app=${pathToFileURL(path.join(spaced, 'app', 'index.html')).href}?t=5m&autostart=1`, spacedArgs[0]);
 
   r = run(['--bogus']);
-  t.check('unknown option: exit 2 with a message', r.code === 2 && /unknown option: --bogus/.test(r.out), r.out.split('\n')[0]);
+  t.check('unknown option: exit 2 with a polite message and the usage', r.code === 2 && /sorry, I don't recognise the option "--bogus"/.test(r.out) && /Usage:/.test(r.out), r.out.split('\n')[0]);
   r = run(['5m', '10m']);
-  t.check('two durations: exit 2 with a message', r.code === 2 && /more than one duration/.test(r.out), r.out.split('\n')[0]);
+  t.check('two durations: exit 2 with a polite message naming both', r.code === 2 && /sorry, please give just one duration \(I got "5m" and "10m"\)/.test(r.out), r.out.split('\n')[0]);
   r = run(['--help']);
   t.check('--help: usage text, ends at the environment section', r.code === 0 && /Usage:/.test(r.out) && /COUNTDOWN_PROFILE/.test(r.out) && !/set -euo/.test(r.out));
   r = run(['--server'], { PATH: `${path.dirname(fake)}:/usr/bin:/bin`, COUNTDOWN_PORT: '8788' });
   const nodeOnPath = spawnSync('sh', ['-c', 'command -v node'], { env: { PATH: '/usr/bin:/bin' } }).status === 0;
-  if (!nodeOnPath) t.check('--server without Node.js: exit 1 with an install hint', r.code === 1 && /needs Node\.js/.test(r.out), r.out.split('\n')[0]);
+  if (!nodeOnPath) t.check('--server without Node.js: exit 1 with a polite install hint', r.code === 1 && /sorry, --server needs Node\.js, which I couldn't find\. Please install it/.test(r.out), r.out.split('\n')[0]);
+
+  // No browser at all: a PATH with only the basic tools the launcher needs.
+  const minbin = path.join(tmp, 'minbin');
+  fs.mkdirSync(minbin);
+  for (const c of ['bash', 'dirname', 'readlink', 'sed', 'mkdir', 'basename']) {
+    const where = spawnSync('sh', ['-c', `command -v ${c}`], { encoding: 'utf8' }).stdout.trim();
+    fs.symlinkSync(where, path.join(minbin, c));
+  }
+  r = run([], { COUNTDOWN_BROWSER: '', PATH: minbin });
+  t.check('no browser found: exit 1, politely asks to set COUNTDOWN_BROWSER', r.code === 1 && /sorry, no Chromium-family browser found; please set COUNTDOWN_BROWSER/.test(r.out), r.out.split('\n')[0]);
+
+  // server.js's own messages.
+  const srv = (args) => spawnSync(process.execPath, [path.join(ROOT, 'server.js'), ...args], { encoding: 'utf8', timeout: 5000 });
+  let s = srv(['--port', 'abc']);
+  t.check('server.js --port abc: exit 2, polite message', s.status === 2 && /sorry, --port must be a whole number from 0 to 65535 \(I got "abc"\)/.test(s.stderr), s.stderr.split('\n')[0]);
+  s = srv(['--bogus']);
+  t.check('server.js unknown option: exit 2, polite message', s.status === 2 && /sorry, I didn't understand that/.test(s.stderr), s.stderr.split('\n')[0]);
+  const blocker = require('net').createServer().listen(8786, '127.0.0.1');
+  await new Promise((res) => blocker.on('listening', res));
+  s = await new Promise((res) => {
+    const c = require('child_process').spawn(process.execPath, [path.join(ROOT, 'server.js'), '--port', '8786', '--quiet']);
+    let err = ''; c.stderr.on('data', (d) => { err += d; });
+    c.on('exit', (code) => res({ status: code, stderr: err }));
+  });
+  blocker.close();
+  t.check('server.js on a port already in use: exit 1, polite message with a hint', s.status === 1 && /sorry, I couldn't start the server .*Port 8786 is already in use; please stop whatever is using it, or choose another with --port/.test(s.stderr), s.stderr.split('\n')[0]);
 } catch (e) {
   t.check('test run completed without exceptions', false, e.message);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 process.exit(t.finish() ? 1 : 0);
+})();

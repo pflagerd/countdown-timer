@@ -51,13 +51,13 @@ function parseOptions() {
       },
     }));
   } catch (err) {
-    console.error(`${err.message}\n\n${USAGE}`);
+    console.error(`server.js: sorry, I didn't understand that: ${err.message}\n\n${USAGE}`);
     process.exit(2);
   }
   if (values.help) { console.log(USAGE); process.exit(0); }
   const port = Number(values.port);
   if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    console.error(`Invalid --port: ${values.port}\n\n${USAGE}`);
+    console.error(`server.js: sorry, --port must be a whole number from 0 to 65535 (I got "${values.port}").\n\n${USAGE}`);
     process.exit(2);
   }
   return { port, bind: values.bind, quiet: values.quiet };
@@ -135,7 +135,12 @@ function main() {
   const log = quiet ? () => {} : (msg) => console.log(`${new Date().toISOString()} ${msg}`);
   const server = http.createServer((req, res) => handle(req, res, log));
   server.on('error', (err) => {
-    console.error(`server.js: ${err.message}`);
+    const hint = err.code === 'EADDRINUSE'
+      ? ` Port ${port} is already in use; please stop whatever is using it, or choose another with --port.`
+      : err.code === 'EACCES'
+        ? ` I'm not allowed to use port ${port}; please choose one above 1023 with --port.`
+        : '';
+    console.error(`server.js: sorry, I couldn't start the server (${err.message}).${hint}`);
     process.exit(1);
   });
   server.listen(port, bind, () => {
