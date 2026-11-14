@@ -22,6 +22,7 @@
 #                      your normal profile (default: see README)
 set -euo pipefail
 
+# usage() prints this script’s own header comment as the help text, so the help and the comment can never drift apart
 usage() { sed -n '2,/^set -euo/{/^#/p}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
