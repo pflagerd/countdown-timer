@@ -104,6 +104,13 @@ function writeJSON(storage, key, value) {
   try { storage.setItem(key, JSON.stringify(value)); } catch { /* unavailable: ignore */ }
 }
 
+// The two storage areas are how "closing the window stops the timer" (#8) works:
+// preferences go to localStorage, which lasts until deleted; the running timer
+// goes to sessionStorage, which belongs to this window only. It survives a
+// reload but the browser discards it when the window closes, so no close
+// handler is needed (close events are unreliable after a crash or kill, and a
+// reload fires them too). load() then finds no timer and starts at READY.
+// https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute
 function save() {
   writeJSON(localStorage, PREFS_KEY, { duration: state.duration, muted: state.muted });
   writeJSON(sessionStorage, SESSION_KEY, {
