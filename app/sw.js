@@ -8,15 +8,17 @@
  * - When the server is NOT running, the installed app still starts, served
  *   entirely from the cache below.
  *
- * Bump VERSION when the asset list changes.
+ * Bump VERSION when the asset list changes, or to make every browser store
+ * all the files afresh (v12 did that, for the page fix described below).
  */
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const CACHE = `countdown-${VERSION}`;
 // The page itself is precached by name, not as './', so that installing the
 // service worker doesn't depend on the web server mapping '/' to countdown.html.
+const PAGE = 'countdown.html';
 const ASSETS = [
-  'countdown.html',
+  PAGE,
   'styles.css',
   'app.js',
   'manifest.json',
@@ -38,22 +40,38 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Is this request the app's page being opened? The page has two addresses:
+// the folder ("/", which the web server maps to countdown.html) and
+// countdown.html itself, each with or without "?t=5m" style parameters.
+// Opening any other file directly (e.g. manifest.json in a tab) is also a
+// "navigate" request, but it isn't the page and must not be stored as it.
+const FOLDER = new URL('./', self.location).pathname;
+function isPage(req) {
+  if (req.mode !== 'navigate') return false;
+  const p = new URL(req.url).pathname;
+  return p === FOLDER || p === FOLDER + PAGE;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
+    // The page is always stored and looked up under the one name PAGE, whichever
+    // address it was opened by. Why it matters: every online load stores the
+    // newest app.js and styles.css, so it must replace the stored page as well.
+    // Before v12 the page fetched online went under './' while an offline start
+    // of countdown.html (the manifest's start_url and shortcuts) was served the
+    // copy precached at install time, never refreshed. After an update that
+    // gave an old page with a new app.js, which don't fit together.
+    const key = isPage(req) ? PAGE : req;
     try {
       const res = await fetch(req);
-      if (res.ok) {
-        // Store navigations under './' so "?t=5m" style URLs share one entry.
-        cache.put(req.mode === 'navigate' ? './' : req, res.clone());
-      }
+      if (res.ok) cache.put(key, res.clone());
       return res;
     } catch (err) {
-      const hit = await cache.match(req, { ignoreSearch: true })
-        || (req.mode === 'navigate' ? (await cache.match('./')) || (await cache.match('countdown.html')) : undefined);
+      const hit = await cache.match(key, { ignoreSearch: true });
       if (hit) return hit;
       throw err;
     }

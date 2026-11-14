@@ -31,9 +31,9 @@ function portOpen(port) {
   });
 }
 
-/** Start server.js on `port` and wait until it accepts connections. */
-async function startServer(port) {
-  const proc = spawn(process.execPath, [path.join(ROOT, 'server.js'), '--port', String(port), '--quiet'], { stdio: 'ignore' });
+/** Start server.js on `port` and wait until it accepts connections. `root` is the folder holding server.js and app/ (a test may serve a copy it can edit). */
+async function startServer(port, root = ROOT) {
+  const proc = spawn(process.execPath, [path.join(root, 'server.js'), '--port', String(port), '--quiet'], { stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     if (await portOpen(port)) return proc;
     await sleep(100);

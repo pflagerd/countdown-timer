@@ -73,7 +73,7 @@ cd tests && npm ci && npm test         # headless suites, both modes (~2 min)
 npm run test:headed                    # also app-window.js and launcher-chime.js (needs a display; Xvfb works)
 ```
 Last full headless run: all 7 suite runs passed. Expected counts:
-- regress: 40 (file), 44 (server)
+- regress: 40 (file), 46 (server)
 - lockdown: 20
 - sound: 7
 - launcher: 26
@@ -96,6 +96,7 @@ Last full headless run: all 7 suite runs passed. Expected counts:
   - Never on `file://`: the browser rejects the scheme, and `app.js` doesn't try.
   - `caches` *does* exist on `file://` in Chromium, and `isSecureContext` is true there (a correction made in Exchange 83).
   - Bump `VERSION` in `sw.js` when `ASSETS` changes, or to discard old caches.
+  - The page is cached under one name (`countdown.html`) whichever address opened it, and every online load replaces it. Before v12 an offline start of `countdown.html` got the copy precached at install time: an old page with a new `app.js` after any update. If `countdown.html` and `app.js` ever change together, the "offline after an update" test in `regress.js` is what guards this.
 - **Heartbeat:** on localhost, each window sends `HEAD manifest.json` every 30 s. `server.js --exit-when-idle 3m` (passed by the launcher) exits after 3 min with no requests or connections.
 - **An installed app (Chromium/Chrome on Linux):**
   - It gets a 32-letter (a–p) app ID and the menu file `~/.local/share/applications/chrome-<ID>-Default.desktop`.

@@ -1,7 +1,10 @@
 'use strict';
 // Functional, layout, #8 (closing stops the timer) and offline / file-mode checks. Headless.
 // Runs against server.js (default) or the file:// version (COUNTDOWN_TEST_MODE=file).
-const { chromium, sleep, startTarget, launchOptions, reporter, view, revealControls } = require('./lib');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { chromium, ROOT, sleep, freePort, startServer, startTarget, launchOptions, reporter, view, revealControls } = require('./lib');
 
 (async () => {
   const target = await startTarget();
@@ -218,6 +221,45 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
       t.check('"/" serves the app page (countdown.html); there is no index.html', pages.root && pages.byName && pages.noIndexHtml === 404, JSON.stringify(pages));
       t.check('manifest start_url and both shortcuts point at countdown.html and load', pages.startUrl === './countdown.html' && pages.start && pages.shortcuts.length === 2 && pages.shortcuts.every(Boolean), JSON.stringify(pages));
       t.check('manifest id unchanged ("./"), so an installed copy stays the same app', pages.id === './', pages.id);
+
+      // --- an update, then an offline start: the cached page must be the updated one.
+      //     A copy of the app is served so the test can "update" it: the page and app.js
+      //     change together (the new app.js reports which page it found itself in).
+      //     Then, with the server stopped, the app is started the way the installed app's
+      //     "5 minutes" shortcut starts it. An old cached page with the new app.js fails here.
+      {
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'countdown-update-test-'));
+        fs.cpSync(path.join(ROOT, 'app'), path.join(tmp, 'app'), { recursive: true });
+        fs.copyFileSync(path.join(ROOT, 'server.js'), path.join(tmp, 'server.js'));
+        const port = await freePort();
+        const srv2 = await startServer(port, tmp);
+        const u = `http://localhost:${port}/`;
+        // After editing, the file's time is set a minute ahead: server.js compares times in whole
+        // seconds, so an edit within the same second as the first load would be answered "304 Not Modified".
+        const edit = (f, fn) => {
+          const file = path.join(tmp, 'app', f);
+          fs.writeFileSync(file, fn(fs.readFileSync(file, 'utf8')));
+          const later = new Date(Date.now() + 60000); fs.utimesSync(file, later, later);
+        };
+        const up = await ctx.newPage();
+        try {
+          await up.goto(u + 'countdown.html');                                   // first visit: service worker installs and precaches
+          await up.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
+          edit('countdown.html', (s) => s.replace('<body>', '<body data-page="updated">'));
+          edit('app.js', (s) => s + "\ndocument.body.dataset.found = document.body.dataset.page || 'old page';\n");
+          await up.goto(u + 'countdown.html'); await sleep(500);                 // one online load of the update
+          srv2.kill(); await sleep(400);
+          const r = await up.goto(u + 'countdown.html?t=5m&autostart=1').catch(() => null); await sleep(300);
+          const found = r ? await up.evaluate(() => document.body.dataset.found) : 'page did not load';
+          v = r ? await view(up) : {};
+          t.check('offline after an update: the cached page is the updated one, and the shortcut URL starts the timer',
+            !!r && r.status() === 200 && found === 'updated' && String(v.status).startsWith('ends'), `${found}; ${v.status}`);
+          const r2 = await up.goto(u).catch(() => null);
+          t.check('offline after an update: "/" gives the same updated page', !!r2 && (await up.evaluate(() => document.body.dataset.found)) === 'updated');
+        } finally {
+          srv2.kill(); await up.close(); fs.rmSync(tmp, { recursive: true, force: true });
+        }
+      }
 
       // --- offline: server stopped, reload served from the service-worker cache
       await p.goto(URL);
