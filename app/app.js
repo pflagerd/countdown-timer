@@ -33,6 +33,7 @@ const el = {
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presetSelect: $('presetSelect'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
+  installBtn: $('installBtn'),
 };
 
 /** status: 'idle' | 'running' | 'paused' | 'done' */
@@ -494,6 +495,37 @@ function toggleMute() {
   changed();
 }
 
+/* ---------------------------------------------------------------- install */
+
+/*
+ * The "Install as an app" button. A page can't ask "am I installed?", and it
+ * can't start an installation by itself; the browser decides both:
+ * - Chromium fires "beforeinstallprompt" when the page can be installed and
+ *   isn't installed yet in this browser profile. The event carries prompt(),
+ *   which opens the browser's own install dialog. So the button is shown only
+ *   once that event has arrived. That covers "not already installed", and also
+ *   the cases where installing is impossible: a file:// page (no manifest or
+ *   service worker there) and browsers without this event (Firefox, Safari),
+ *   where the button simply never appears.
+ *   https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event
+ * - "appinstalled" fires when the installation succeeds: hide the button again.
+ * - prompt() works once per event, so the event is dropped after use. If the
+ *   dialog is cancelled, Chromium fires a new event and the button comes back.
+ * preventDefault() isn't called on the event: on desktop it changes nothing,
+ * and on Android it would only suppress the browser's own install hint.
+ */
+let installEvent = null;
+function setInstallEvent(e) {
+  installEvent = e;
+  el.installBtn.hidden = !e;
+}
+function install() {
+  const e = installEvent;
+  if (!e) return;
+  setInstallEvent(null);
+  e.prompt().catch(() => {});   // rejects if the dialog can't be shown; nothing to do then
+}
+
 /**
  * Kiosk-style lock-down: no right-click menu, no dragging, and no browser
  * keyboard shortcuts (Ctrl+S, Ctrl+P, F5, Ctrl+R, Ctrl+zoom, …). Every keydown
@@ -544,6 +576,9 @@ function bindEvents() {
   el.resetBtn.addEventListener('click', reset);
   el.muteBtn.addEventListener('click', toggleMute);
   el.fsBtn.addEventListener('click', toggleFullscreen);
+  el.installBtn.addEventListener('click', install);
+  addEventListener('beforeinstallprompt', setInstallEvent);
+  addEventListener('appinstalled', () => setInstallEvent(null));
   document.addEventListener('fullscreenchange', syncFullscreenButton);
   addEventListener('resize', fitToWindow);
 

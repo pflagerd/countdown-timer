@@ -73,7 +73,7 @@ cd tests && npm ci && npm test         # headless suites, both modes (~2 min)
 npm run test:headed                    # also app-window.js and launcher-chime.js (needs a display; Xvfb works)
 ```
 Last full headless run: all 7 suite runs passed. Expected counts:
-- regress: 40 (file), 44 (server)
+- regress: 44 (file), 48 (server)
 - lockdown: 20
 - sound: 7
 - launcher: 26
@@ -97,6 +97,11 @@ Last full headless run: all 7 suite runs passed. Expected counts:
   - `caches` *does* exist on `file://` in Chromium, and `isSecureContext` is true there (a correction made in Exchange 83).
   - Bump `VERSION` in `sw.js` when `ASSETS` changes, or to discard old caches.
 - **Heartbeat:** on localhost, each window sends `HEAD manifest.json` every 30 s. `server.js --exit-when-idle 3m` (passed by the launcher) exits after 3 min with no requests or connections.
+- **Installing:**
+  - The launcher's `--app=` window has no address bar or ⋮ menu, and the page blocks right-click, so the browser offers no install control there (a correction made in Exchange 107). Hence the page's own install button.
+  - The install button shows only after Chromium's `beforeinstallprompt` (fired only when installable and not yet installed in that profile). Never on `file://`.
+  - Measured (Playwright Chromium, Xvfb, server mode): the event fires in a normal tab *and* in a `--app=` window. A `--app=` window reports `(display-mode: standalone)`, so that media query can't be used to detect "installed".
+  - A Chrome install also drops a second, identical `.desktop` file into the user's Desktop folder (the owner's is `~/desktops/default`; Exchange 111).
 - **An installed app (Chromium/Chrome on Linux):**
   - It gets a 32-letter (a–p) app ID and the menu file `~/.local/share/applications/chrome-<ID>-Default.desktop`.
   - That file contains `Exec=… --app-id=<ID>` and `StartupWMClass=crx_<ID>`.
