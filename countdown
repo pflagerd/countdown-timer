@@ -78,7 +78,7 @@ if [[ -z $browser ]]; then
     if command -v "$b" >/dev/null 2>&1; then browser=$b; break; fi
   done
 fi
-[[ -n $browser ]] || { echo "countdown: no Chromium-family browser found; set COUNTDOWN_BROWSER" >&2; exit 1; }
+[[ -n $browser ]] || { echo "countdown: no Chromium-family browser found; please set COUNTDOWN_BROWSER" >&2; exit 1; }
 
 # The timer's own Chromium profile. A separate profile means a separate
 # Chromium process, so the switches below take effect even if Chromium is
