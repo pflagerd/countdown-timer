@@ -1,15 +1,17 @@
 'use strict';
-// Functional, layout, #8 (closing stops the timer) and offline checks. Headless.
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, revealControls } = require('./lib');
+// Functional, layout, #8 (closing stops the timer) and offline / file-mode checks. Headless.
+// Runs against server.js (default) or the file:// version (COUNTDOWN_TEST_MODE=file).
+const { chromium, sleep, startTarget, launchOptions, reporter, view, revealControls } = require('./lib');
 
 (async () => {
-  const port = await freePort();
-  const URL = `http://localhost:${port}/`;
-  let srv = await startServer(port);
-  const t = reporter('regress');
+  const target = await startTarget();
+  const { URL } = target;
+  const t = reporter(`regress [${target.mode}]`);
   const b = await chromium.launch(launchOptions());
   const ctx = await b.newContext({ viewport: { width: 420, height: 420 } });
   const errs = []; ctx.on('weberror', (e) => errs.push(String(e.error())));
+  const consoleMsgs = [];
+  ctx.on('console', (m) => { if (m.type() === 'warning' || m.type() === 'error') consoleMsgs.push(`${m.type()}: ${m.text().split('\n')[0]}`); });
   const open = async (u = URL) => { const p = await ctx.newPage(); await p.goto(u); await sleep(250); return p; };
   try {
     let p, v;
@@ -148,16 +150,25 @@ const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, r
     }
     t.check('layout: no scroll bars, clock fully visible and >= 200px, controls inside the clock (10 sizes)', bad.length === 0, bad.join(' ') || 'ok');
 
-    // --- offline: server stopped, reload served from the service-worker cache
-    await p.setViewportSize({ width: 420, height: 420 }); await p.goto(URL);
-    await p.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
-    srv.kill(); srv = null; await sleep(400);
-    const r = await p.reload().catch(() => null);
-    t.check('offline: reload served from the service-worker cache (HTTP 200)', !!r && r.status() === 200, r && r.status());
+    await p.setViewportSize({ width: 420, height: 420 });
+    if (target.mode === 'server') {
+      // --- offline: server stopped, reload served from the service-worker cache
+      await p.goto(URL);
+      await p.evaluate(() => navigator.serviceWorker.ready); await sleep(300);
+      target.stop(); await sleep(400);
+      const r = await p.reload().catch(() => null);
+      t.check('offline: reload served from the service-worker cache (HTTP 200)', !!r && r.status() === 200, r && r.status());
+    } else {
+      // --- file mode: no service worker is registered (browsers don't allow it on file://)
+      await p.goto(URL); await sleep(500);
+      const regs = await p.evaluate(() => navigator.serviceWorker.getRegistrations().then((r) => r.length).catch(() => 0));
+      t.check('file mode: no service worker registered', regs === 0, regs);
+    }
+    t.check('no console warnings or errors during the run', consoleMsgs.length === 0, consoleMsgs.slice(0, 3).join(' | ') || 'none');
   } catch (e) {
     t.check('test run completed without exceptions', false, e.message);
   } finally {
-    await b.close(); if (srv) srv.kill();
+    await b.close(); target.stop();
   }
   process.exit(t.finish(errs) ? 1 : 0);
 })();

@@ -7,17 +7,16 @@
 // its default). Playwright's injected keys never trigger Chromium's own
 // shortcuts, even without the lock-down, so whether Chromium actually skips
 // e.g. Ctrl+S has to be checked by hand with a real keyboard.
-const { chromium, sleep, freePort, startServer, launchOptions, reporter, view, revealControls } = require('./lib');
+const { chromium, sleep, startTarget, launchOptions, reporter, view, revealControls } = require('./lib');
 
 const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', 'Control+Minus', 'Control+0', 'Control+f', 'Control+u',
   'F12', 'Control+Shift+i', 'Control+a', 'Alt+ArrowLeft', 'Backspace', 'F11', 'Control+t', 'Control+n', 'Control+w',
   'Control+Shift+r', 'F1', 'F3', 'F7', 'Alt+Home'];
 
 (async () => {
-  const port = await freePort();
-  const URL = `http://localhost:${port}/`;
-  const srv = await startServer(port);
-  const t = reporter('lockdown');
+  const target = await startTarget();
+  const { URL } = target;
+  const t = reporter(`lockdown [${target.mode}]`);
   const b = await chromium.launch(launchOptions());
   const p = await b.newPage({ viewport: { width: 420, height: 420 } });
   const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
@@ -86,7 +85,7 @@ const BLOCKED = ['Control+s', 'Control+p', 'Control+r', 'F5', 'Control+Equal', '
   } catch (e) {
     t.check('test run completed without exceptions', false, e.message);
   } finally {
-    await b.close(); srv.kill();
+    await b.close(); target.stop();
   }
   process.exit(t.finish(errs) ? 1 : 0);
 })();

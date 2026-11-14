@@ -39,7 +39,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than that, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the clock stays fully visible at any window size, just smaller.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
-No build step, no npm packages, no frameworks. The only runtime requirement besides a Chromium-family browser is [Node.js](https://nodejs.org/) (for the small local server, `server.js`, which uses only Node's built-in modules). On Kubuntu: `sudo apt install nodejs`; on Fedora: `sudo dnf install nodejs`.
+No build step, no npm packages, no frameworks. By default the only requirement is a Chromium-family browser. [Node.js](https://nodejs.org/) is needed only for the optional local server (`./countdown --server`, which runs `server.js` using only Node's built-in modules). On Kubuntu: `sudo apt install nodejs`; on Fedora: `sudo dnf install nodejs`.
 
 ## Quick start
 
@@ -47,7 +47,7 @@ No build step, no npm packages, no frameworks. The only runtime requirement besi
 ./countdown
 ```
 
-That's all. The script starts the local server (if it isn't already running) and opens the timer in an app-mode window, which has no tabs, address bar or toolbar.
+That's all. The script opens the timer **straight from `app/index.html`** in an app-mode window, which has no tabs, address bar or toolbar. No server is involved.
 
 ```bash
 ./countdown 25m
@@ -55,17 +55,42 @@ That's all. The script starts the local server (if it isn't already running) and
 
 Opens the window, sets 25 minutes and starts the timer immediately. The big hand starts at "25" and moves counter-clockwise to 0.
 
-Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30:00` (h:mm:ss), or a bare number meaning minutes (`10`, `2.5`).
+Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30:00` (h:mm:ss), or a bare number meaning minutes (`10`, `2.5`). `./countdown --help` shows the usage.
+
+### Two ways to run it
+
+| | `./countdown` (default) | `./countdown --server` |
+|---|---|---|
+| Opens | `file://…/app/index.html` | `http://localhost:8765/`, served by `server.js` |
+| Needs | only Chromium | Chromium and Node.js |
+| Installable as a Chrome app | No: Chrome only installs apps served over HTTPS or `localhost` ([install criteria](https://web.dev/articles/install-criteria)) | Yes (see below) |
+| Offline cache (service worker) | Not used; the files are already local, and browsers don't allow service workers on `file://` | Yes |
+| Chime when you never click the window | May be silent: Chrome's [autoplay policy](https://developer.chrome.com/blog/autoplay) only exempts installed apps | Plays once installed |
+| Remembered duration and mute | Its own | Its own, separate from the file version |
+
+Both use the same `app/` folder; nothing is duplicated. Options combine in any order, e.g. `./countdown --server 25m`.
+
+**Snap Chromium (Kubuntu's default):** keep the repo somewhere that isn't inside a hidden folder (one whose name starts with `.`). As I read the snap [`home` interface](https://snapcraft.io/docs/home-interface), snaps can only read non-hidden files in your home directory, so `file://` might fail to load from a hidden folder.
 
 Environment overrides for `./countdown`:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `COUNTDOWN_PORT` | `8765` | Port for the local server. **Note:** the origin includes the port, so a different port is a different app with separate storage and a separate install. |
 | `COUNTDOWN_BROWSER` | first one found of `chromium`, `chromium-browser`, `google-chrome-stable`, `google-chrome`, `brave-browser`, `microsoft-edge` | Browser executable |
 | `COUNTDOWN_SIZE` | `420,420` | Initial window `WIDTH,HEIGHT` in pixels |
+| `COUNTDOWN_PORT` | `8765` | Port for `--server`. **Note:** the origin includes the port, so a different port is a different app with separate storage and a separate install. |
 
 ### What the launcher actually runs
+
+Default (file) mode:
+
+```bash
+chromium --app=file:///path/to/countdown-timer/app/index.html --window-size=420,420
+```
+
+The path is percent-encoded, so folders with spaces or non-ASCII names work.
+
+With `--server`, it first starts the server if nothing is listening on the port yet:
 
 ```bash
 node server.js --port 8765 --quiet
@@ -86,9 +111,9 @@ chromium --app=http://localhost:8765/ --window-size=420,420
 
 Both switches are defined in Chromium's [`chrome/common/chrome_switches.cc`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.cc) (search for `kApp` and `kWindowSize`). Caveat: if Chromium is already running, the new command is handed to the existing browser process. `--app` is honoured in that case, but some browser-wide switches may not be.
 
-### Installing it as a PWA (optional, recommended)
+### Installing it as a PWA (server mode only)
 
-1. Open the app once, either with `./countdown` or by visiting `http://localhost:8765/` in Chromium.
+1. Open the app once, either with `./countdown --server` or by visiting `http://localhost:8765/` (with `server.js` running) in Chromium.
 2. Choose **⋮ → Cast, save and share → Install page as app…**. The menu wording varies between Chromium versions. In app-mode windows, the install option is in the window's own menu.
 
 Chromium then creates a launcher entry in `~/.local/share/applications/`, so "Countdown" shows up in the KDE application menu. It opens in a standalone window (`"display": "standalone"` in the manifest; see the [Web App Manifest `display` member](https://www.w3.org/TR/appmanifest/#display-member)).
@@ -119,7 +144,7 @@ The page also accepts URL parameters: `http://localhost:8765/?t=25m&autostart=1`
 ## Layout
 
 ```
-countdown          launcher (bash): starts the server if needed, opens an app-mode window
+countdown          launcher (bash): opens app/index.html in an app-mode window; --server starts server.js and uses http://localhost
 server.js          static file server for ./app (Node.js built-in modules only)
 app/
   index.html       markup: SVG face + HTML readout overlaid in its centre

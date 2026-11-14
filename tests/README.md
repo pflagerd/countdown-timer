@@ -3,8 +3,13 @@
 Browser tests for the countdown timer, driven by [Playwright](https://playwright.dev/) (Apache-2.0).
 They're an **optional developer tool**: the app itself has no dependencies, and nothing here is needed to run it.
 
-Each run starts its own `server.js` on a free port, so it doesn't clash with a server you already have
-running on 8765, and every run starts with clean browser storage.
+Every suite runs twice: against the default **file** version (`file://…/app/index.html`, what `./countdown` opens)
+and against the **server** version (what `./countdown --server` opens). For the server runs, each suite starts its
+own `server.js` on a free port, so it doesn't clash with a server you already have running on 8765. Every run starts
+with clean browser storage.
+
+To run a single suite in one mode, set `COUNTDOWN_TEST_MODE` to `file` or `server` (the default), e.g.
+`COUNTDOWN_TEST_MODE=file node regress.js`.
 
 ## Setup (once)
 
@@ -34,7 +39,7 @@ running on 8765, and every run starts with clean browser storage.
 
 ## Running
 
-From the `tests/` directory, run the headless suites (about 40 s):
+From the `tests/` directory, run the headless suites in both modes (about 1½ minutes):
 ```bash
 npm test
 ```
@@ -51,7 +56,7 @@ To use a different Chromium binary instead of Playwright's own, set `CHROMIUM_PA
 
 | Suite | Checks |
 |---|---|
-| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown**, and the tooltip on disabled controls. **Controls overlay:** hidden until hover or focus, only as big as the controls, clicks outside it start/pause. **Layout:** 10 window sizes. **Offline:** reload served from the service-worker cache. |
+| `regress.js` | **Timer:** URL `?t=` / autostart, countdown, pause, reload, overtime, reset, presets. **Hands:** angles, and that they turn counter-clockwise. **#8:** closing stops the timer, a reload doesn't, mute is remembered, old saved state is migrated, windows are independent. **Presets dropdown**, and the tooltip on disabled controls. **Controls overlay:** hidden until hover or focus, only as big as the controls, clicks outside it start/pause. **Layout:** 10 window sizes. **Server mode:** reload served from the service-worker cache with the server stopped. **File mode:** no service worker registered. **Both:** no console warnings or errors. |
 | `lockdown.js` | Right-click, dragging and 23 browser shortcuts are cancelled. The app's own keys, typing in the time fields, Tab, Enter on buttons and the dropdown still work. |
 | `app-window.js` | A real `chromium --app=…` window: #8 end to end (reload keeps the timer; quitting and relaunching gives READY) and `window.close()`. |
 

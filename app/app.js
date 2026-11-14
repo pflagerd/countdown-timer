@@ -602,7 +602,10 @@ function boot() {
   ensureLoop();
   render();
 
-  if ('serviceWorker' in navigator) {
+  // The offline cache (service worker) only exists when served over http(s),
+  // i.e. `./countdown --server`. Opened straight from a file (the default),
+  // browsers don't allow service workers, and the files are local anyway.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
   }
 }
