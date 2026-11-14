@@ -3,7 +3,7 @@
 Browser tests for the countdown timer, driven by [Playwright](https://playwright.dev/) (Apache-2.0).
 They're an **optional developer tool**: the app itself has no dependencies, and nothing here is needed to run it.
 
-Each run starts its own `serve.py` on a free port, so it doesn't clash with a server you already have
+Each run starts its own `server.js` on a free port, so it doesn't clash with a server you already have
 running on 8765, and every run starts with clean browser storage.
 
 ## Setup (once)

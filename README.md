@@ -39,7 +39,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **The clock never disappears.** The face is never laid out smaller than 200 px (`--face-min` in `styles.css`). As far as I know, browsers have no API to stop a window from being resized smaller. So when the window is smaller than that, `app.js` scales the **whole UI down uniformly** to fit (like zooming out). There are no scroll bars, and the clock stays fully visible at any window size, just smaller.
 - **Themes:** dark and light, following `prefers-color-scheme`.
 
-No build step, no npm, no frameworks. The only runtime requirement besides a Chromium-family browser is Python 3, which is preinstalled on Kubuntu.
+No build step, no npm packages, no frameworks. The only runtime requirement besides a Chromium-family browser is [Node.js](https://nodejs.org/) (for the small local server, `server.js`, which uses only Node's built-in modules). On Kubuntu: `sudo apt install nodejs`; on Fedora: `sudo dnf install nodejs`.
 
 ## Quick start
 
@@ -68,14 +68,14 @@ Environment overrides for `./countdown`:
 ### What the launcher actually runs
 
 ```bash
-python3 serve.py --port 8765 --quiet
+node server.js --port 8765 --quiet
 ```
 
 - `--port 8765` is the TCP port to listen on.
 - `--bind` (default `127.0.0.1`) is the address to listen on. The default means only this machine can connect.
-- `--quiet` stops per-request logging.
+- `--quiet` stops per-request logging. `--help` lists the options.
 
-`serve.py` is a thin wrapper around Python's standard [`http.server`](https://docs.python.org/3/library/http.server.html) module. It adds two things: explicit MIME types, and a `Cache-Control: no-cache` header so edits show up on the next reload.
+`server.js` is a small static file server built only on Node's built-in [`http`](https://nodejs.org/api/http.html) and [`fs`](https://nodejs.org/api/fs.html) modules (no npm packages). It serves `app/` with explicit file types and a `Cache-Control: no-cache` header, so edits show up on the next reload. It supports `If-Modified-Since`, refuses paths that would escape `app/`, and answers only `GET` and `HEAD`.
 
 ```bash
 chromium --app=http://localhost:8765/ --window-size=420,420
@@ -95,7 +95,7 @@ Chromium then creates a launcher entry in `~/.local/share/applications/`, so "Co
 
 The manifest also declares two **shortcuts**, "5 minutes" and "25 minutes". I *believe* Chromium on Linux exposes them as right-click actions on the launcher entry, but I haven't verified that on KDE.
 
-Because the service worker is network-first with a cache fallback, the installed app starts **even when `serve.py` isn't running**. I tested this: I killed the server and reloaded, and the page came back from the cache with HTTP 200. Updates are only picked up when the server is running.
+Because the service worker is network-first with a cache fallback, the installed app starts **even when `server.js` isn't running**. I tested this: I killed the server and reloaded, and the page came back from the cache with HTTP 200. Updates are only picked up when the server is running.
 
 **Why plain HTTP is OK:** service workers need a [secure context](https://www.w3.org/TR/secure-contexts/), and `http://localhost` / `127.0.0.1` count as ["potentially trustworthy" origins](https://www.w3.org/TR/secure-contexts/#is-origin-trustworthy). No TLS certificate is needed.
 
@@ -120,7 +120,7 @@ The page also accepts URL parameters: `http://localhost:8765/?t=25m&autostart=1`
 
 ```
 countdown          launcher (bash): starts the server if needed, opens an app-mode window
-serve.py           stdlib-only static server for ./app
+server.js          static file server for ./app (Node.js built-in modules only)
 app/
   index.html       markup: SVG face + HTML readout overlaid in its centre
   styles.css       theming via CSS custom properties; sizes use container-query units
