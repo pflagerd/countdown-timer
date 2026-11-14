@@ -11,13 +11,18 @@
 #
 #   DURATION: 25m, 1h30m, 90s, 5:00, 1:30:00, or a bare number of minutes (10).
 #
+# The timer runs in its own Chromium profile, started with sound allowed
+# without a click, so the chime plays even if you never touch the window.
+#
 # Environment overrides:
 #   COUNTDOWN_BROWSER  browser executable to use           (default: first found)
 #   COUNTDOWN_SIZE     initial window size, WIDTH,HEIGHT   (default 420,420)
 #   COUNTDOWN_PORT     port for --server                   (default 8765)
+#   COUNTDOWN_PROFILE  Chromium profile folder for the timer, or "none" to use
+#                      your normal profile (default: see README)
 set -euo pipefail
 
-usage() { sed -n '2,17p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,/^set -euo/{/^#/p}' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 here=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)
 size=${COUNTDOWN_SIZE:-420,420}
@@ -74,4 +79,32 @@ if [[ -z $browser ]]; then
 fi
 [[ -n $browser ]] || { echo "countdown: no Chromium-family browser found; set COUNTDOWN_BROWSER" >&2; exit 1; }
 
-exec "$browser" --app="${url}" --window-size="${size}" >/dev/null 2>&1
+# The timer's own Chromium profile. A separate profile means a separate
+# Chromium process, so the switches below take effect even if Chromium is
+# already open with your normal profile. A snap Chromium (Kubuntu's default)
+# can't write to hidden folders like ~/.local, so it gets a folder inside the
+# snap's own area instead.
+profile=${COUNTDOWN_PROFILE:-}
+if [[ -z $profile ]]; then
+  # /snap/bin/<name> is a link to /usr/bin/snap, so check both the path found
+  # on PATH and what it resolves to.
+  browser_cmd=$(command -v "$browser" || printf '%s' "$browser")
+  browser_real=$(readlink -f "$browser_cmd" 2>/dev/null || printf '%s' "$browser_cmd")
+  if [[ $browser_cmd == /snap/bin/* || $browser_real == */bin/snap || $browser_real == /snap/* ]]; then
+    profile="$HOME/snap/$(basename "$browser_cmd")/common/countdown-timer-profile"
+  else
+    profile="${XDG_DATA_HOME:-$HOME/.local/share}/countdown-timer/chromium-profile"
+  fi
+fi
+
+args=(--app="${url}" --window-size="${size}")
+if [[ $profile != none ]]; then
+  mkdir -p "$profile"
+  args+=(
+    --user-data-dir="$profile"
+    --autoplay-policy=no-user-gesture-required   # chime without a click
+    --no-first-run --no-default-browser-check    # no welcome / default-browser prompts in the new profile
+  )
+fi
+
+exec "$browser" "${args[@]}" >/dev/null 2>&1

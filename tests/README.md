@@ -43,7 +43,7 @@ From the `tests/` directory, run the headless suites in both modes (about 1½ mi
 ```bash
 npm test
 ```
-Also run the real app-window suite. It briefly opens real Chromium windows, so it needs a desktop session:
+Also run the suites that open real Chromium windows (`app-window.js`, `launcher-chime.js`). They need a desktop session:
 ```bash
 npm run test:headed
 ```
@@ -60,6 +60,8 @@ To use a different Chromium binary instead of Playwright's own, set `CHROMIUM_PA
 | `sound.js` | The chime, under Chromium's real autoplay rule (normal launch = sound needs a click; `--autoplay-policy=no-user-gesture-required` = allowed). Started without a click: "click for sound" shown and no tones; one click enables sound without pausing or dismissing; clicking to start or a key press plays it; mute suppresses it; when sound is allowed it plays with no click. Playwright's reads count as clicks, so the page records a timeline and the test reads it only afterwards. |
 | `lockdown.js` | Right-click, dragging and 23 browser shortcuts are cancelled. The app's own keys, typing in the time fields, Tab, Enter on buttons and the dropdown still work. |
 | `app-window.js` | A real `chromium --app=…` window: #8 end to end (reload keeps the timer; quitting and relaunching gives READY) and `window.close()`. |
+| `launcher.js` | The `./countdown` launcher, with stand-in browsers that record their arguments (no real browser). Checks: file URL by default; `--server` URL; durations; the timer's own profile (location for snap and other Chromium-family browsers, plus the allow-sound and no-first-run switches); `COUNTDOWN_PROFILE` (`none` and a custom folder); percent-encoding of paths with spaces/non-ASCII; error exits; `--help`. Runs once (not per mode). |
+| `launcher-chime.js` | Headed, end to end: the real launcher starts Chromium (`./countdown 0:05`, and `--server 0:05`); the test only listens to the browser console and never clicks. With the timer's own profile, Chromium must **not** log "The AudioContext was not allowed to start". A control run without that profile must log it, which shows the check can tell the difference. |
 
 **Not covered automatically:** whether Chromium itself skips its shortcuts (`Ctrl+S`, `F5`, …) once the page cancels them.
 Playwright's injected keys never trigger Chromium's own shortcuts, even without the lock-down, so check that by hand

@@ -12,7 +12,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Thin progress bar** just below the readout. It is drawn translucent on purpose so it stays in the background.
 - **Status line** showing the wall-clock end time (`ENDS 9:02 PM`), or `PAUSED` / `TIME'S UP`.
 - **Colours:** the face turns amber in the last 10 % and red when time runs out. After that it counts overtime (`+00:04`).
-- **Chime:** made with Web Audio, so there are no audio files. You can mute it. If the browser is blocking sound (the timer was started without any click, e.g. `./countdown 25m`), a **"click for sound"** line appears under the status. That first click only enables sound: it doesn't pause the timer or dismiss the alarm.
+- **Chime:** made with Web Audio, so there are no audio files. You can mute it. Started with `./countdown`, it plays even if you never touch the window (see "The timer's own Chromium profile" below). If a browser does block sound (e.g. the page opened some other way and never clicked), a **"click for sound"** line appears under the status. That first click only enables sound: it doesn't pause the timer or dismiss the alarm.
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
@@ -65,7 +65,7 @@ Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30
 | Needs | only Chromium | Chromium and Node.js |
 | Installable as a Chrome app | No: Chrome only installs apps served over HTTPS or `localhost` ([install criteria](https://web.dev/articles/install-criteria)) | Yes (see below) |
 | Offline cache (service worker) | Not used; the files are already local, and browsers don't allow service workers on `file://` | Yes |
-| Chime when you never click the window | Blocked by Chrome's [autoplay policy](https://developer.chrome.com/blog/autoplay); the window shows "click for sound" | Blocked unless installed (installed apps are exempt, per that policy; not yet checked on your desktop); otherwise "click for sound" |
+| Chime when you never click the window | Plays (the launcher's own profile allows it) | Plays (same) |
 | Remembered duration and mute | Its own | Its own, separate from the file version |
 
 Both use the same `app/` folder; nothing is duplicated. Options combine in any order, e.g. `./countdown --server 25m`.
@@ -79,16 +79,39 @@ Environment overrides for `./countdown`:
 | `COUNTDOWN_BROWSER` | first one found of `chromium`, `chromium-browser`, `google-chrome-stable`, `google-chrome`, `brave-browser`, `microsoft-edge` | Browser executable |
 | `COUNTDOWN_SIZE` | `420,420` | Initial window `WIDTH,HEIGHT` in pixels |
 | `COUNTDOWN_PORT` | `8765` | Port for `--server`. **Note:** the origin includes the port, so a different port is a different app with separate storage and a separate install. |
+| `COUNTDOWN_PROFILE` | see below | Folder for the timer's own Chromium profile, or `none` to use your normal Chromium profile (the chime then needs a click). |
+
+### The timer's own Chromium profile
+
+`./countdown` runs the timer in a Chromium profile of its own, started with sound allowed without a click. That way the chime plays even if you start a timer with `./countdown 25m` and never touch the window. Chrome's [autoplay policy](https://developer.chrome.com/blog/autoplay) otherwise blocks sound until the first click.
+
+- **Where it lives:**
+  - snap Chromium (Kubuntu's default): `~/snap/chromium/common/countdown-timer-profile`. The snap can't write to hidden folders such as `~/.local`, so it goes in the snap's own folder.
+  - any other Chromium-family browser: `~/.local/share/countdown-timer/chromium-profile` (or under `$XDG_DATA_HOME`).
+  - your own choice: set `COUNTDOWN_PROFILE=/some/folder`.
+- **A separate Chromium process:** it runs alongside your normal browser, even if that's already open. That's what makes the switches take effect. If you start a second timer while one is open, it opens as another window in the same process.
+- **Separate saved settings:** the remembered duration and mute setting live in this profile, apart from your normal browser.
+- **To reset it:** close the timer and delete the folder.
+- **Installing (`--server`):** if you install the app from a window opened by `./countdown --server`, it's installed into this profile. To install it into your normal Chromium, open `http://localhost:8765/` there (with `./countdown --server` or `node server.js` running), or run `COUNTDOWN_PROFILE=none ./countdown --server`.
+- **Checked here:** on Xvfb, with the timer started by the real launcher and never clicked, Chromium did **not** block the chime in either mode. Without this profile (the control), it did. The snap location and Chromium 157 on your desktop are not yet confirmed.
 
 ### What the launcher actually runs
 
-Default (file) mode:
+Default (file) mode, e.g. with snap Chromium:
 
 ```bash
-chromium --app=file:///path/to/countdown-timer/app/index.html --window-size=420,420
+chromium --app=file:///path/to/countdown-timer/app/index.html --window-size=420,420 \
+  --user-data-dir="$HOME/snap/chromium/common/countdown-timer-profile" \
+  --autoplay-policy=no-user-gesture-required --no-first-run --no-default-browser-check
 ```
 
-The path is percent-encoded, so folders with spaces or non-ASCII names work.
+- `--app=URL`: a window with no tabs or address bar. The path is percent-encoded, so folders with spaces or non-ASCII names work.
+- `--window-size=W,H`: initial window size.
+- `--user-data-dir=DIR`: use the timer's own profile, and therefore its own Chromium process.
+- `--autoplay-policy=no-user-gesture-required`: allow sound without a click.
+- `--no-first-run`, `--no-default-browser-check`: skip the welcome and "make default browser" prompts in the new profile. Without `--no-first-run`, a brand-new profile in my tests stalled at first-run setup.
+
+All of these are Chromium command-line switches; the list is maintained in Chromium's source ([`chrome_switches.cc`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.cc) and related files).
 
 With `--server`, it first starts the server if nothing is listening on the port yet:
 
@@ -160,9 +183,9 @@ tests/             optional Playwright browser tests (see tests/README.md)
 
 - **Timing:** while running, the app stores `endAt` (the epoch time when the timer ends) and computes `remaining = endAt − now` on every frame. It never decrements a counter, so throttled timers, a hidden window or a reload can't make it drift.
 - **Alarm timer:** the alarm is one `setTimeout` scheduled for `endAt`. Chrome's ["intensive" throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88) (one wake-up per minute for hidden pages) applies only to *chained* timers, so a single timeout isn't affected. The visual updates use `requestAnimationFrame`, which pauses while the window is hidden, and resume immediately when it's shown again.
-- **Sound needs a user gesture:** Chrome only lets audio play after a click or key press, or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them; so is the command-line switch `--autoplay-policy=no-user-gesture-required`).
+- **Sound needs a user gesture:** Chrome only lets audio play after a click or key press, or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them; so is the command-line switch `--autoplay-policy=no-user-gesture-required`, which the launcher uses).
   - **What the app does:** any click or key press in the window unlocks audio. When time's up, the app always creates its audio context and tries to play, so the chime sounds whenever the browser allows it.
-  - **When the browser blocks it:** if you start the timer with `./countdown 25m` and never touch the window, the chime is blocked. The window then shows **"click for sound"**, and the red visual alarm still appears.
+  - **When the browser blocks it:** for example the page opened in a normal browser window, or with `COUNTDOWN_PROFILE=none`, and never clicked. The window then shows **"click for sound"**, and the red visual alarm still appears.
   - **The first click:** it only enables sound; it doesn't pause the timer or dismiss the alarm.
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
 - **Multiple windows:** each window is an independent timer. They share only the remembered duration and mute setting, as of the moment a window opens.
