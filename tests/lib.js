@@ -1,7 +1,7 @@
 'use strict';
 /*
  * Shared helpers for the countdown-timer tests.
- * Each run starts its own serve.py on a free port, so it never collides with a
+ * Each run starts its own server.js on a free port, so it never collides with a
  * server you already have running (and every run gets fresh browser storage,
  * because storage is per origin and the port is part of the origin).
  */
@@ -29,15 +29,15 @@ function portOpen(port) {
   });
 }
 
-/** Start serve.py on `port` and wait until it accepts connections. */
+/** Start server.js on `port` and wait until it accepts connections. */
 async function startServer(port) {
-  const proc = spawn('python3', [path.join(ROOT, 'serve.py'), '--port', String(port), '--quiet'], { stdio: 'ignore' });
+  const proc = spawn(process.execPath, [path.join(ROOT, 'server.js'), '--port', String(port), '--quiet'], { stdio: 'ignore' });
   for (let i = 0; i < 50; i++) {
     if (await portOpen(port)) return proc;
     await sleep(100);
   }
   proc.kill();
-  throw new Error(`serve.py did not start on port ${port}`);
+  throw new Error(`server.js did not start on port ${port}`);
 }
 
 /** Browser launch options; set CHROMIUM_PATH to use a specific Chromium binary. */
