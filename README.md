@@ -21,6 +21,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
   - **The overlay:** they sit on a transparent overlay that is only as big as the controls, so only the controls themselves cover the clock.
   - **Clicking:** a click anywhere else in the window starts or pauses the timer. A click on a control, or in the gaps between controls, never does.
   - **What they are:** the `hh : mm : ss` fields, a **Preset…** dropdown, and icon buttons (▶/❚❚ start-pause, ⟲ reset, speaker mute, ⛶ fullscreen), each with a tooltip naming its keyboard shortcut. They scale with the clock.
+  - **Install button (⤓), only when it applies:** it appears after the fullscreen button when the browser reports that the page can be installed as an app and isn't installed yet. See "Installing it as a PWA" below.
   - **While the timer runs:** the time fields and the preset dropdown are disabled. Hovering them shows "Disabled while the timer is running".
 - **Locked down like a kiosk.** The page cancels:
   - the right-click menu, and dragging;
@@ -158,7 +159,17 @@ Both switches are defined in Chromium's [`chrome/common/chrome_switches.h`](http
 ### Installing it as a PWA (server mode only)
 
 1. Open the app once, either with `./countdown --server` or by visiting `http://localhost:8765/` (with `server.js` running) in Chromium.
-2. Choose **⋮ → Cast, save and share → Install page as app…**. The menu wording varies between Chromium versions. In app-mode windows, the install option is in the window's own menu.
+2. Install it, in either of two ways:
+   - **The install button (⤓) in the hover controls.** Click it, then confirm in the browser's own install dialog.
+   - **The browser's menu**, in a normal browser window: the install icon in the address bar, or **⋮ → Cast, save and share → Install page as app…**. The menu wording varies between Chromium versions.
+
+**About the install button:**
+- **When it shows:** only after Chromium fires [`beforeinstallprompt`](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event), which it does when the page is installable and not yet installed in that browser profile. A page has no other way to ask "am I installed?", so the app relies on that event. The button hides again once the app is installed.
+- **Never in file mode** (`./countdown` without `--server`): a `file://` page can't be installed.
+- **Not in Firefox or Safari:** they don't have this event, so the button never appears there.
+- **Which profile it installs into:** the profile of the window you click it in. In a window opened by `./countdown --server`, that is the timer's own profile (see above); in a normal browser window, your normal profile.
+- **Correction:** this README used to say that app-mode windows have the install option in the window's own menu. They don't: a `--app=` window has no browser menu at all, which is why the button was added.
+- **Checked here:** in Playwright's Chromium on Xvfb, served by `server.js`, the button appeared both in a normal tab and in a `--app=` window. Clicking through the real install dialog has not been tested automatically.
 
 Chromium then creates a launcher entry in `~/.local/share/applications/`, so "Countdown" shows up in the KDE application menu. It opens in a standalone window (`"display": "standalone"` in the manifest; see the [Web App Manifest `display` member](https://www.w3.org/TR/appmanifest/#display-member)).
 
@@ -182,6 +193,7 @@ Because the service worker is network-first with a cache fallback, the installed
 | Presets | **Preset…** dropdown: 1m 5m 10m 15m 25m 45m 1h | |
 | Mute / unmute | speaker icon | `M` |
 | Fullscreen | ⛶ | `F` |
+| Install as an app (shown only when possible and not yet installed) | ⤓ | |
 
 The page also accepts URL parameters: `http://localhost:8765/?t=25m&autostart=1`. They are removed from the address after they're applied, so reloading the page doesn't restart the timer.
 

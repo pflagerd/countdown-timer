@@ -197,6 +197,34 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
       }
     }
 
+    // --- the "Install as an app" button: shown only after the browser's beforeinstallprompt
+    //     (which Chromium fires only when the page is installable and not installed yet).
+    //     A real install dialog can't be driven from a test, so the events are stand-ins.
+    p = await open();
+    const installHidden = () => p.evaluate(() => { const b = document.getElementById('installBtn'); return b.hidden && getComputedStyle(b).display === 'none'; });
+    t.check('install button: hidden until the browser offers an install', await installHidden());
+    await p.evaluate(() => {
+      window.__prompts = 0;
+      const e = new Event('beforeinstallprompt');
+      e.prompt = () => { window.__prompts++; return Promise.resolve({ outcome: 'dismissed' }); };
+      dispatchEvent(e);
+    });
+    await revealControls(p);
+    const fits = await p.evaluate(() => {
+      const r = (id) => document.getElementById(id).getBoundingClientRect();
+      const b = r('installBtn'), f = r('face'), fs = r('fsBtn');
+      return b.width > 0 && b.left >= fs.right && b.top === fs.top && b.right <= f.right;
+    });
+    t.check('install button: shown after beforeinstallprompt, in the row after fullscreen, inside the clock', fits);
+    await p.click('#installBtn'); v = await view(p);
+    t.check('install button: a click opens the install prompt once, hides the button, leaves the timer alone',
+      (await p.evaluate(() => window.__prompts)) === 1 && await installHidden() && v.status === 'ready', v.status);
+    await p.evaluate(() => { const e = new Event('beforeinstallprompt'); e.prompt = () => Promise.resolve(); dispatchEvent(e); });
+    const back = !(await installHidden());
+    await p.evaluate(() => dispatchEvent(new Event('appinstalled')));
+    t.check('install button: comes back on a new offer, hidden again once installed', back && await installHidden());
+    await p.close(); p = await open();
+
     if (target.mode === 'server') {
       // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
       //     shortcuts point at it by name (so they also work on servers without that default)

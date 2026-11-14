@@ -232,6 +232,8 @@ button.icon {
   padding: 0;
 }
 button.icon.primary { width: 3.9em; }
+/* "display: inline-grid" above would otherwise override the hidden attribute (the install button starts hidden). */
+button.icon[hidden] { display: none; }
 button.icon svg {
   width: 1.35em;
   height: 1.35em;
