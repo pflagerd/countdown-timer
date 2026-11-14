@@ -172,6 +172,31 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
       }
     }
 
+    // --- service worker registration: a spy, installed before app.js runs, records every
+    //     navigator.serviceWorker.register() call. File mode must make none (browsers refuse
+    //     service workers on file://, so app.js must not even try). Server mode must make
+    //     exactly one, for sw.js, which also shows the spy really sees calls.
+    //     (Asking getRegistrations() instead can't tell: on file:// it always throws.)
+    {
+      const sp = await ctx.newPage();
+      await sp.addInitScript(() => {
+        window.__swRegisterCalls = [];
+        const orig = ServiceWorkerContainer.prototype.register;
+        ServiceWorkerContainer.prototype.register = function (url, ...rest) {
+          window.__swRegisterCalls.push(String(url));
+          return orig.call(this, url, ...rest);
+        };
+      });
+      await sp.goto(URL); await sleep(500);
+      const calls = await sp.evaluate(() => window.__swRegisterCalls);
+      await sp.close();
+      if (target.mode === 'server') {
+        t.check('server mode: app.js registers the service worker once (sw.js)', calls.length === 1 && calls[0] === 'sw.js', JSON.stringify(calls));
+      } else {
+        t.check('file mode: app.js never calls serviceWorker.register()', calls.length === 0, JSON.stringify(calls));
+      }
+    }
+
     if (target.mode === 'server') {
       // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
       //     shortcuts point at it by name (so they also work on servers without that default)
@@ -200,11 +225,6 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
       target.stop(); await sleep(400);
       const r = await p.reload().catch(() => null);
       t.check('offline: reload served from the service-worker cache (HTTP 200)', !!r && r.status() === 200, r && r.status());
-    } else {
-      // --- file mode: no service worker is registered (browsers don't allow it on file://)
-      await p.goto(URL); await sleep(500);
-      const regs = await p.evaluate(() => navigator.serviceWorker.getRegistrations().then((r) => r.length).catch(() => 0));
-      t.check('file mode: no service worker registered', regs === 0, regs);
     }
     t.check('no console warnings or errors during the run', consoleMsgs.length === 0, consoleMsgs.slice(0, 3).join(' | ') || 'none');
   } catch (e) {
