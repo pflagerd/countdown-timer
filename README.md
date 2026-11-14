@@ -12,7 +12,7 @@ A small, dependency-free countdown timer you can install as a PWA (Progressive W
 - **Thin progress bar** just below the readout. It is drawn translucent on purpose so it stays in the background.
 - **Status line** showing the wall-clock end time (`ENDS 9:02 PM`), or `PAUSED` / `TIME'S UP`.
 - **Colours:** the face turns amber in the last 10 % and red when time runs out. After that it counts overtime (`+00:04`).
-- **Chime:** made with Web Audio, so there are no audio files. You can mute it.
+- **Chime:** made with Web Audio, so there are no audio files. You can mute it. If the browser is blocking sound (the timer was started without any click, e.g. `./countdown 25m`), a **"click for sound"** line appears under the status. That first click only enables sound: it doesn't pause the timer or dismiss the alarm.
 - **Screen Wake Lock** while the timer runs, so the display doesn't go to sleep.
 - **Closing the app stops the timer; a reload doesn't.** The running timer lives in [`sessionStorage`](https://html.spec.whatwg.org/multipage/webstorage.html#the-sessionstorage-attribute), which survives a reload of the same window but is discarded when the window closes. The next launch starts at **READY**. Your last duration and the mute setting are kept in `localStorage`, so they are remembered across launches.
 - **Works offline** once it's installed. The service worker serves the cached app when the local server isn't running.
@@ -65,7 +65,7 @@ Accepted duration formats: `25m`, `1h30m`, `90s`, `1h2m3s`, `5:00` (m:ss), `1:30
 | Needs | only Chromium | Chromium and Node.js |
 | Installable as a Chrome app | No: Chrome only installs apps served over HTTPS or `localhost` ([install criteria](https://web.dev/articles/install-criteria)) | Yes (see below) |
 | Offline cache (service worker) | Not used; the files are already local, and browsers don't allow service workers on `file://` | Yes |
-| Chime when you never click the window | May be silent: Chrome's [autoplay policy](https://developer.chrome.com/blog/autoplay) only exempts installed apps | Plays once installed |
+| Chime when you never click the window | Blocked by Chrome's [autoplay policy](https://developer.chrome.com/blog/autoplay); the window shows "click for sound" | Blocked unless installed (installed apps are exempt, per that policy; not yet checked on your desktop); otherwise "click for sound" |
 | Remembered duration and mute | Its own | Its own, separate from the file version |
 
 Both use the same `app/` folder; nothing is duplicated. Options combine in any order, e.g. `./countdown --server 25m`.
@@ -160,7 +160,10 @@ tests/             optional Playwright browser tests (see tests/README.md)
 
 - **Timing:** while running, the app stores `endAt` (the epoch time when the timer ends) and computes `remaining = endAt − now` on every frame. It never decrements a counter, so throttled timers, a hidden window or a reload can't make it drift.
 - **Alarm timer:** the alarm is one `setTimeout` scheduled for `endAt`. Chrome's ["intensive" throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88) (one wake-up per minute for hidden pages) applies only to *chained* timers, so a single timeout isn't affected. The visual updates use `requestAnimationFrame`, which pauses while the window is hidden, and resume immediately when it's shown again.
-- **Sound needs a user gesture:** Chrome only lets audio play after a user gesture or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them). Any click or key press in the window unlocks audio. If you start the timer with `./countdown 25m` in a *non-installed* window and never touch the window, the chime may stay silent; the red visual alarm still appears. The installed PWA shouldn't have this problem.
+- **Sound needs a user gesture:** Chrome only lets audio play after a click or key press, or in [some other cases](https://developer.chrome.com/blog/autoplay) (installed PWAs are one of them; so is the command-line switch `--autoplay-policy=no-user-gesture-required`).
+  - **What the app does:** any click or key press in the window unlocks audio. When time's up, the app always creates its audio context and tries to play, so the chime sounds whenever the browser allows it.
+  - **When the browser blocks it:** if you start the timer with `./countdown 25m` and never touch the window, the chime is blocked. The window then shows **"click for sound"**, and the red visual alarm still appears.
+  - **The first click:** it only enables sound; it doesn't pause the timer or dismiss the alarm.
 - **Wake Lock:** uses the [Screen Wake Lock API](https://www.w3.org/TR/screen-wake-lock/) while the timer runs. The lock is released by the browser when the window is hidden and taken again when it becomes visible.
 - **Multiple windows:** each window is an independent timer. They share only the remembered duration and mute setting, as of the moment a window opens.
 - **Regenerating icons:** the PNG icons were rendered from the SVGs in `app/icons/` with headless Chromium. If you change the SVGs, re-render them (e.g. `rsvg-convert -w 512 icon.svg > icon-512.png` from `librsvg2-bin`) and bump `VERSION` in `sw.js`.

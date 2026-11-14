@@ -7,7 +7,7 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
 
-const suites = ['regress.js', 'lockdown.js'];
+const suites = ['regress.js', 'lockdown.js', 'sound.js'];
 if (process.argv.includes('--headed')) suites.push('app-window.js');
 
 const runs = [];

@@ -30,7 +30,7 @@ const $ = (id) => document.getElementById(id);
 const el = {
   face: $('face'), arc: $('arc'), ticks: $('ticks'), labels: $('labels'), hourLabels: $('hourLabels'),
   hourHand: $('hourHand'), minHand: $('minHand'), secHand: $('secHand'),
-  digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
+  digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'), soundHint: $('soundHint'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presetSelect: $('presetSelect'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
 };
@@ -165,17 +165,49 @@ function beep(t, freq, dur) {
   osc.stop(t + dur + 0.02);
 }
 
-function chime() {
-  if (state.muted || !audioCtx || audioCtx.state !== 'running') return;
+function playChime() {
   const t = audioCtx.currentTime + 0.02;
   beep(t, 880, 0.16);
   beep(t + 0.2, 880, 0.16);
   beep(t + 0.4, 1175, 0.28);
 }
 
+let resumePending = false;
+function chime() {
+  if (state.muted || !audioCtx) return;
+  if (audioCtx.state === 'running') { playChime(); return; }
+  // Suspended (no click yet): try to start it anyway. This succeeds when the
+  // browser allows sound without a click (e.g. an installed app, or Chromium
+  // started with --autoplay-policy=no-user-gesture-required); otherwise the
+  // promise waits until a click/key press resumes the context.
+  if (resumePending) return;
+  resumePending = true;
+  audioCtx.resume()
+    .then(() => { if (!state.muted && state.status === 'done' && audioCtx.state === 'running') playChime(); })
+    .catch(() => {})
+    .finally(() => { resumePending = false; });
+}
+
+/**
+ * True while the timer is running / ringing but the chime can't be heard yet
+ * because the browser blocks sound until the user clicks or presses a key.
+ * Used to show the "click for sound" hint.
+ */
+function soundBlocked() {
+  if (state.muted || (state.status !== 'running' && state.status !== 'done')) return false;
+  if (audioCtx && audioCtx.state === 'running') return false;
+  if (typeof navigator.getAutoplayPolicy === 'function') {
+    try { return navigator.getAutoplayPolicy('audiocontext') !== 'allowed'; } catch { /* fall through */ }
+  }
+  return !(navigator.userActivation && navigator.userActivation.hasBeenActive);
+}
+
 let alarmTimer = 0;
 function startAlarm() {
   stopAlarm();
+  // The timer may have been started without any click (./countdown 25m), in
+  // which case no AudioContext exists yet: create one now and try to play.
+  if (!state.muted) unlockAudio();
   let n = 0;
   const ring = () => {
     chime();
@@ -372,6 +404,8 @@ function render(now = Date.now()) {
     default:        status = 'ready';
   }
   if (status !== lastStatus) { el.status.textContent = status; lastStatus = status; }
+  const hintHidden = !soundBlocked();
+  if (el.soundHint.hidden !== hintHidden) el.soundHint.hidden = hintHidden;
 
   el.face.classList.toggle('warn', (state.status === 'running' || state.status === 'paused') && frac <= 0.1);
   el.face.classList.toggle('done', state.status === 'done');
@@ -497,7 +531,15 @@ function lockDownBrowserDefaults() {
   }, { capture: true });
 }
 
+let swallowClick = false;
+
 function bindEvents() {
+  // If sound is blocked while the timer runs (the "click for sound" hint is
+  // showing), the next click only enables sound: it must not also pause the
+  // timer or dismiss the alarm. Decided from what's on screen: by the time a
+  // pointerdown handler runs, the browser already counts the page as clicked.
+  addEventListener('pointerdown', (e) => { swallowClick = e.button === 0 && !el.soundHint.hidden; }, { capture: true });
+
   // Any interaction unlocks audio (needed when started via ?autostart=1).
   for (const type of ['pointerdown', 'keydown']) {
     addEventListener(type, unlockAudio, { capture: true });
@@ -512,6 +554,7 @@ function bindEvents() {
   // controls overlay, which is only as big as the controls it holds (gaps
   // included), so a click meant for a control never toggles the timer.
   document.addEventListener('click', (e) => {
+    if (swallowClick) { swallowClick = false; return; }   // that click only enabled sound
     if (e.button === 0 && !e.target.closest('#controls')) toggle();
   });
   el.startBtn.addEventListener('click', toggle);
