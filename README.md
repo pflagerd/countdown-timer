@@ -111,7 +111,11 @@ chromium --app=file:///path/to/countdown-timer/app/index.html --window-size=420,
 - `--autoplay-policy=no-user-gesture-required`: allow sound without a click.
 - `--no-first-run`, `--no-default-browser-check`: skip the welcome and "make default browser" prompts in the new profile. Without `--no-first-run`, a brand-new profile in my tests stalled at first-run setup.
 
-All of these are Chromium command-line switches; the list is maintained in Chromium's source ([`chrome_switches.cc`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.cc) and related files).
+All of these are Chromium command-line switches, each defined, with a comment explaining it, in Chromium's source:
+- `--app` (`kApp`), `--window-size` (`kWindowSize`), `--user-data-dir` (`kUserDataDir`), `--no-first-run` (`kNoFirstRun`) and `--no-default-browser-check` (`kNoDefaultBrowserCheck`) are in [`chrome/common/chrome_switches.h`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.h).
+- `--autoplay-policy` (`kAutoplayPolicy`) and its value `no-user-gesture-required` (`kNoUserGestureRequiredPolicy`) are in [`media/base/media_switches.cc`](https://source.chromium.org/chromium/chromium/src/+/main:media/base/media_switches.cc).
+
+Checked against Chromium's main branch on 2026-11-14. Besides the source, the behaviour of `--app`, `--user-data-dir`, `--autoplay-policy` and `--no-first-run` was tested (see `tests/`). `--window-size` and `--no-default-browser-check` have only been checked in the source.
 
 With `--server`, it first starts the server if nothing is listening on the port yet:
 
@@ -132,7 +136,7 @@ chromium --app=http://localhost:8765/ --window-size=420,420
 - `--app=<url>` opens the URL in a window with no browser UI.
 - `--window-size=<w>,<h>` sets the initial window size.
 
-Both switches are defined in Chromium's [`chrome/common/chrome_switches.cc`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.cc) (search for `kApp` and `kWindowSize`). Caveat: if Chromium is already running, the new command is handed to the existing browser process. `--app` is honoured in that case, but some browser-wide switches may not be.
+Both switches are defined in Chromium's [`chrome/common/chrome_switches.h`](https://source.chromium.org/chromium/chromium/src/+/main:chrome/common/chrome_switches.h) (search for `kApp` and `kWindowSize`). Caveat: if Chromium is already running, the new command is handed to the existing browser process. `--app` is honoured in that case, but some browser-wide switches may not be.
 
 ### Installing it as a PWA (server mode only)
 
