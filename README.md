@@ -120,12 +120,21 @@ Checked against Chromium's main branch on 2026-11-14. Besides the source, the be
 With `--server`, it first starts the server if nothing is listening on the port yet:
 
 ```bash
-node server.js --port 8765 --quiet
+node server.js --port 8765 --quiet --exit-when-idle 3m
 ```
 
 - `--port 8765` is the TCP port to listen on.
 - `--bind` (default `127.0.0.1`) is the address to listen on. The default means only this machine can connect.
 - `--quiet` stops per-request logging. `--help` lists the options.
+- `--exit-when-idle 3m` makes the server exit after 3 minutes with no requests (times such as `90s` also work). Without it, the server runs until it is stopped.
+
+**The server stops by itself about 3 minutes after the last timer window closes.**
+- **The heartbeat:** while a window is open, the page sends a tiny `HEAD manifest.json` request every 30 seconds, which keeps the server running (`startHeartbeat()` in `app.js`).
+- **Several windows:** they share one server. Later launches reuse the one already running, so it stops only once all the windows are closed.
+- **Where it applies:** the heartbeat is sent only on `localhost`, so a copy served from elsewhere (e.g. a VPS) doesn't send it. A `node server.js` you start without `--exit-when-idle` never exits by itself.
+- **If the server stops while a window is still open, e.g. after a long sleep, nothing breaks.** The countdown carries on, a reload is served from the service-worker cache (see below), and the next `./countdown --server` starts a new server.
+- **Why 30 seconds:** Chromium may slow a hidden window's timers to about once a minute after 5 minutes ([Chrome's timer throttling](https://developer.chrome.com/blog/timer-throttling-in-chrome-88)), which still leaves a wide margin.
+- **To stop it sooner:** `pkill -f 'server.js --port 8765'`. Here `-f` matches the pattern against the whole command line, not just the process name `node` ([pkill(1)](https://man7.org/linux/man-pages/man1/pkill.1.html)).
 
 `server.js` is a small static file server built only on Node's built-in [`http`](https://nodejs.org/api/http.html) and [`fs`](https://nodejs.org/api/fs.html) modules (no npm packages). It serves `app/` with explicit file types and a `Cache-Control: no-cache` header, so edits show up on the next reload. It supports `If-Modified-Since`, refuses paths that would escape `app/`, and answers only `GET` and `HEAD`.
 

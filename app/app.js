@@ -633,6 +633,26 @@ function boot() {
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
   }
+  startHeartbeat();
+}
+
+// Heartbeat: "./countdown --server" starts server.js with --exit-when-idle 3m,
+// so the server keeps running only while a timer window is open. Each window
+// therefore asks the server for a tiny response every 30 s. Only on localhost:
+// a file:// page has no server, and a hosted copy (e.g. a VPS) doesn't need it.
+// - HEAD of an existing file gets 200 from any server, so nothing is logged as
+//   an error; sw.js passes HEAD straight to the network (it caches GET only), and
+//   "no-store" bypasses the browser's HTTP cache, so the request really arrives.
+// - 30 s, not 60 s: Chrome may delay timers in a hidden window to about once
+//   a minute, which still leaves a wide margin below the server's 3 minutes.
+// - Failures are ignored: if the server is gone, the page carries on (a reload
+//   is served from the service worker's cache).
+const HEARTBEAT_MS = 30000;
+function startHeartbeat() {
+  if (!/^https?:$/.test(location.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)) return;
+  const beat = () => fetch('manifest.json', { method: 'HEAD', cache: 'no-store' }).catch(() => {});
+  setInterval(beat, HEARTBEAT_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
 }
 
 // Entry point: countdown.html loads this file with "defer", so the browser runs it once the page is built; boot() is the equivalent of main(), and everything after it is driven by events.

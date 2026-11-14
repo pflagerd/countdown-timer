@@ -6,7 +6,9 @@
 #   ./countdown              open the timer straight from app/countdown.html (no server)
 #   ./countdown 25m          ...and set 25 minutes and start immediately
 #   ./countdown --server     serve app/ with server.js (Node.js) on http://localhost
-#                            instead; this is the version Chrome can install as an app
+#                            instead; this is the version Chrome can install as an app.
+#                            The server stops by itself about 3 minutes after the
+#                            last timer window closes.
 #   ./countdown --server 25m
 #
 #   DURATION: 25m, 1h30m, 90s, 5:00, 1:30:00, or a bare number of minutes (10).
@@ -57,10 +59,12 @@ urlencode_path() {
 if (( server )); then
   url="http://localhost:${port}/"
   port_open() { (exec 3<>"/dev/tcp/127.0.0.1/${port}") 2>/dev/null; }  # /dev/tcp/HOST/PORT isn't a real file. It's a bash feature: opening that "path" makes bash try a TCP connection to that host and port (https://www.gnu.org/software/bash/manual/bash.html#Redirections)
-  # Start the server in the background if nothing is listening yet.
+  # Start the server in the background if nothing is listening yet. With
+  # --exit-when-idle it stops by itself about 3 minutes after the last timer
+  # window closes (each open window pings it every 30 s; see app.js).
   if ! port_open; then
     command -v node >/dev/null 2>&1 || { echo "countdown: sorry, --server needs Node.js, which I couldn't find. Please install it (Kubuntu: sudo apt install nodejs; Fedora: sudo dnf install nodejs), or run ./countdown without --server." >&2; exit 1; }
-    nohup node "${here}/server.js" --port "${port}" --quiet >/dev/null 2>&1 &
+    nohup node "${here}/server.js" --port "${port}" --quiet --exit-when-idle 3m >/dev/null 2>&1 &
     for _ in $(seq 1 30); do port_open && break; sleep 0.1; done
     port_open || { echo "countdown: sorry, the server didn't start on port ${port}. Please try again, or choose another port with COUNTDOWN_PORT (e.g. COUNTDOWN_PORT=8766 ./countdown --server)." >&2; exit 1; }
   fi

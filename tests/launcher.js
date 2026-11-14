@@ -56,6 +56,8 @@ try {
   r = run(['--server', '1h30m']);
   t.check('--server: http://localhost:<port>/ with the duration', r.code === 0 && has(r, '--app=http://localhost:8789/?t=1h30m&autostart=1'), r.browserArgs[0] || r.out);
   t.check("--server: also uses the timer's own profile and allows sound", has(r, ownProfile) && has(r, '--autoplay-policy=no-user-gesture-required'));
+  const cmd = spawnSync('pgrep', ['-af', 'server.js --port 8789'], { encoding: 'utf8' }).stdout.trim();
+  t.check('--server: starts server.js with --exit-when-idle 3m (stops by itself once no window is open)', / --exit-when-idle 3m\b/.test(cmd), cmd || 'no server.js process');
   spawnSync('pkill', ['-f', 'server.js --port 8789']);
 
   r = run([], { COUNTDOWN_BROWSER: '', PATH: `${path.join(tmp, 'snap', 'bin')}:/usr/bin:/bin` });
@@ -105,6 +107,8 @@ try {
   const srv = (args) => spawnSync(process.execPath, [path.join(ROOT, 'server.js'), ...args], { encoding: 'utf8', timeout: 5000 });
   let s = srv(['--port', 'abc']);
   t.check('server.js --port abc: exit 2, polite message', s.status === 2 && /sorry, --port must be a whole number from 0 to 65535 \(I got "abc"\)/.test(s.stderr), s.stderr.split('\n')[0]);
+  s = srv(['--exit-when-idle', 'soon']);
+  t.check('server.js --exit-when-idle soon: exit 2, polite message', s.status === 2 && /sorry, --exit-when-idle needs a time such as 3m or 90s \(I got "soon"\)/.test(s.stderr), s.stderr.split('\n')[0]);
   s = srv(['--bogus']);
   t.check('server.js unknown option: exit 2, polite message', s.status === 2 && /sorry, I didn't understand that/.test(s.stderr), s.stderr.split('\n')[0]);
   const blocker = require('net').createServer().listen(8786, '127.0.0.1');
@@ -116,6 +120,29 @@ try {
   });
   blocker.close();
   t.check('server.js on a port already in use: exit 1, polite message with a hint', s.status === 1 && /sorry, I couldn't start the server .*Port 8786 is already in use; please stop whatever is using it, or choose another with --port/.test(s.stderr), s.stderr.split('\n')[0]);
+
+  // --exit-when-idle: a server with a 2 s limit that is pinged every second stays up,
+  // then exits by itself (status 0) about 2 s after the pings stop.
+  {
+    const { spawn } = require('child_process');
+    const started = Date.now();
+    const c = spawn(process.execPath, [path.join(ROOT, 'server.js'), '--port', '8785', '--exit-when-idle', '2s']);
+    const exited = new Promise((res) => c.on('exit', (code) => res({ code, after: Date.now() - started })));
+    let out = ''; c.stdout.on('data', (d) => { out += d; });
+    let alive = true; exited.then(() => { alive = false; });
+    await new Promise((res) => setTimeout(res, 500));
+    let lastRequest = 0;
+    for (let i = 0; i < 4; i++) {
+      lastRequest = Date.now() - started;
+      await fetch('http://127.0.0.1:8785/manifest.json', { method: 'HEAD' }).catch(() => {});
+      await new Promise((res) => setTimeout(res, 1000));
+    }
+    t.check('server.js --exit-when-idle 2s: still running while pinged every second (4.5 s)', alive, alive ? 'running' : 'exited early');
+    const e = await Promise.race([exited, new Promise((res) => setTimeout(() => res(null), 5000))]);
+    if (!e) c.kill();
+    t.check('server.js --exit-when-idle 2s: exits by itself (status 0) about 2 s after the last request', !!e && e.code === 0 && e.after - lastRequest >= 1900 && e.after - lastRequest <= 3500 && /no requests for 2s; stopping/.test(out),
+      e ? `exit ${e.code} after ${((e.after - lastRequest) / 1000).toFixed(1)} s idle` : 'still running after 5 s');
+  }
 } catch (e) {
   t.check('test run completed without exceptions', false, e.message);
 } finally {

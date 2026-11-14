@@ -153,6 +153,25 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view, revealContr
     t.check('layout: no scroll bars, clock fully visible and >= 200px, controls inside the clock (10 sizes)', bad.length === 0, bad.join(' ') || 'ok');
 
     await p.setViewportSize({ width: 420, height: 420 });
+
+    // --- heartbeat: on localhost, each window sends HEAD manifest.json every 30 s so that
+    //     "server.js --exit-when-idle" keeps running while a window is open; never on file://.
+    //     Playwright's fake clock runs 61 s of the page's timers in an instant.
+    {
+      const hp = await ctx.newPage();
+      await hp.clock.install();
+      const beats = [];
+      hp.on('response', (r) => { if (r.request().method() === 'HEAD') beats.push(`${r.status()} ${new globalThis.URL(r.url()).pathname}`); });
+      await hp.goto(URL); await sleep(300);
+      await hp.clock.runFor(61000); await sleep(500);
+      await hp.close();
+      if (target.mode === 'server') {
+        t.check('heartbeat: HEAD manifest.json every 30 s (2 in 61 s), answered 200', beats.length === 2 && beats.every((b) => b === '200 /manifest.json'), beats.join(', ') || 'none');
+      } else {
+        t.check('heartbeat: none in file mode (no server to keep alive)', beats.length === 0, beats.join(', ') || 'none');
+      }
+    }
+
     if (target.mode === 'server') {
       // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
       //     shortcuts point at it by name (so they also work on servers without that default)
