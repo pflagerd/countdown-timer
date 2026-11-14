@@ -38,7 +38,7 @@ tests/             Playwright suites (optional dev tool; see tests/README.md)
 
 Every exchange with the owner is logged as **one comment on issue #10**.
 - Exchanges 1–96 are on #2 (now closed); 1–37 were first on PR #9.
-- **The next exchange number is 102.**
+- **The next exchange number is one more than the last comment on #10.** (No number is kept here, because it went stale after every exchange.)
 
 Format of each comment:
 ```
@@ -105,7 +105,7 @@ Last full headless run: all 7 suite runs passed. Expected counts:
 
 ## Where things stand (2026-11-14)
 
-- **`main`** has everything up to PR #15 (merge commit c725a5b).
+- **`main`** has everything up to PR #24 (merge commit e2d95d0). Since PR #15 only `CLAUDE.md` and `.gitignore` (`.idea/`) changed; the app, launcher and tests are as of PR #15.
 - **#20, "Use cases: status and checks (collector)":** the five use cases (in the owner's words), status, and a checklist. Its sub-issues:
   - **#16** KDE menu entry (two routes: Chromium install vs our own `.desktop`; also "where the repo lives").
   - **#17** VPS hosting. Prerequisite for use cases 2–5. Owner to answer: is there a domain? Which web server? Which deploy method?
