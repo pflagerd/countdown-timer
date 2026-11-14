@@ -628,4 +628,5 @@ function boot() {
   }
 }
 
+// Entry point: countdown.html loads this file with "defer", so the browser runs it once the page is built; boot() is the equivalent of main(), and everything after it is driven by events.
 boot();
