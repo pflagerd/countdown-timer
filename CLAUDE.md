@@ -111,7 +111,8 @@ Last full headless run: all 7 suite runs passed. Expected counts:
 
 ## Where things stand (2026-11-14)
 
-- **`main`** has everything up to PR #24 (merge commit e2d95d0). Since PR #15 only `CLAUDE.md` and `.gitignore` (`.idea/`) changed; the app, launcher and tests are as of PR #15.
+- **`main`** has everything up to PR #26 (merge commit 0664202): the service-worker page fix (`sw.js` v12).
+- **PR #25 (open, draft):** the install button, plus fixes to these notes. A review is posted on it; finding 1 was fixed by PR #26, findings 2–7 are open (finding 2 needs the owner's decision).
 - **#20, "Use cases: status and checks (collector)":** the five use cases (in the owner's words), status, and a checklist. Its sub-issues:
   - **#16** KDE menu entry (two routes: Chromium install vs our own `.desktop`; also "where the repo lives").
   - **#17** VPS hosting. Prerequisite for use cases 2–5. Owner to answer: is there a domain? Which web server? Which deploy method?
