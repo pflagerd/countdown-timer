@@ -33,6 +33,7 @@ const el = {
   digits: $('digits'), bar: $('bar'), barFill: $('barFill'), status: $('status'),
   inH: $('inH'), inM: $('inM'), inS: $('inS'), presetSelect: $('presetSelect'),
   startBtn: $('startBtn'), resetBtn: $('resetBtn'), muteBtn: $('muteBtn'), fsBtn: $('fsBtn'),
+  installBtn: $('installBtn'),
 };
 
 /** status: 'idle' | 'running' | 'paused' | 'done' */
@@ -494,6 +495,67 @@ function toggleMute() {
   changed();
 }
 
+/* ---------------------------------------------------------------- install */
+
+/*
+ * The "Install as an app" button. A page can't simply ask "am I installed?",
+ * and it can't start an installation by itself; the browser decides both:
+ * - Chromium fires "beforeinstallprompt" when the page can be installed and
+ *   isn't installed yet in this browser profile. The event carries prompt(),
+ *   which opens the browser's own install dialog. So the button is shown only
+ *   once that event has arrived. That covers "not already installed", and also
+ *   the cases where installing is impossible: a file:// page (Chromium doesn't
+ *   offer installation there; it isn't a secure origin for this purpose) and
+ *   browsers without this event (Firefox, Safari), where the button simply
+ *   never appears.
+ *   https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeinstallprompt_event
+ * - "Installed" is per browser profile. A window opened by ./countdown uses
+ *   the timer's own profile, which can't see a copy installed in your normal
+ *   browser, so the button shows there and installs a separate copy.
+ * - "appinstalled" fires when the installation succeeds (by this button or by
+ *   the browser's own menu): hide the button.
+ * - prompt() works once per event. If the dialog is cancelled, Chromium fires
+ *   a new event straight away, which becomes the button's next offer.
+ * preventDefault() isn't called on the event: on desktop it changes nothing,
+ * and on Android it would only suppress the browser's own install hint.
+ */
+let installEvent = null;   // the browser's latest unused offer; null when there is none, or while its dialog is open
+
+function offerInstall(e) {
+  installEvent = e;
+  el.installBtn.hidden = false;
+}
+
+function hideInstall() {
+  installEvent = null;
+  // Hiding a focused button drops keyboard focus to the page, and the controls
+  // (shown only while focus is inside them) would fade away under a keyboard
+  // user: hand focus to the neighbouring button first.
+  if (document.activeElement === el.installBtn) el.fsBtn.focus();
+  el.installBtn.hidden = true;
+}
+
+function install() {
+  const e = installEvent;
+  if (!e) return;          // the dialog is already open
+  installEvent = null;     // prompt() works once per event
+  // The button stays visible while the dialog is open, so a keyboard user who
+  // cancels the dialog is still on it.
+  let shown;
+  try { shown = e.prompt(); } catch (err) { shown = Promise.reject(err); }
+  Promise.resolve(shown).then(() => e.userChoice).then(() => {
+    // Accepted: "appinstalled" hides the button. Cancelled: Chromium has sent
+    // a new offer by now. If neither happened within a second, the button
+    // would do nothing when pressed, so hide it.
+    setTimeout(() => { if (!installEvent && !el.installBtn.hidden) hideInstall(); }, 1000);
+  }, (err) => {
+    // NotAllowedError: the browser wanted a real click or key press, and the
+    // offer is still unused, so keep it for the next press. Anything else
+    // means the offer is spent.
+    if (err && err.name === 'NotAllowedError') { if (!installEvent) installEvent = e; } else hideInstall();
+  });
+}
+
 /**
  * Kiosk-style lock-down: no right-click menu, no dragging, and no browser
  * keyboard shortcuts (Ctrl+S, Ctrl+P, F5, Ctrl+R, Ctrl+zoom, …). Every keydown
@@ -544,6 +606,9 @@ function bindEvents() {
   el.resetBtn.addEventListener('click', reset);
   el.muteBtn.addEventListener('click', toggleMute);
   el.fsBtn.addEventListener('click', toggleFullscreen);
+  el.installBtn.addEventListener('click', install);
+  addEventListener('beforeinstallprompt', offerInstall);
+  addEventListener('appinstalled', hideInstall);
   document.addEventListener('fullscreenchange', syncFullscreenButton);
   addEventListener('resize', fitToWindow);
 

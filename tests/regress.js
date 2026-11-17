@@ -200,6 +200,71 @@ const { chromium, ROOT, sleep, freePort, startServer, startTarget, launchOptions
       }
     }
 
+    // --- the "Install as an app" button: shown only after the browser's beforeinstallprompt
+    //     (which Chromium fires only when the page is installable and not installed yet).
+    //     The browser's real offer and dialog can't be driven from this headless suite, so
+    //     stand-in events are used: offer() sends one whose prompt() counts its calls, and
+    //     choose() answers its dialog. The real offer is checked in app-window.js.
+    {
+      await p.close(); p = await open();
+      const btn = () => p.evaluate(() => {
+        const b = document.getElementById('installBtn');
+        return { hidden: b.hidden && getComputedStyle(b).display === 'none', focused: document.activeElement === b, focusId: document.activeElement.id, prompts: window.__prompts || 0 };
+      });
+      const offer = (blocked = false) => p.evaluate((blocked) => {
+        window.__prompts = window.__prompts || 0;
+        const e = new Event('beforeinstallprompt');
+        e.userChoice = new Promise((r) => { window.__choose = r; });
+        e.prompt = () => { window.__prompts++; return blocked ? Promise.reject(new DOMException('needs a user gesture', 'NotAllowedError')) : Promise.resolve(); };
+        dispatchEvent(e);
+      }, blocked);
+      const choose = (outcome) => p.evaluate((outcome) => window.__choose({ outcome }), outcome);
+      const rects = () => p.evaluate(() => ['startBtn', 'resetBtn', 'muteBtn', 'fsBtn', 'installBtn'].map((id) => {
+        const r = document.getElementById(id).getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round);
+      }));
+      let s = await btn();
+      t.check('install button: hidden while the browser has made no offer', s.hidden);
+
+      await revealControls(p); const before = await rects();
+      await offer(); await revealControls(p); const after = await rects();
+      const [fsR, inR] = [after[3], after[4]];
+      t.check('install button: shown after an offer, right after fullscreen; the other four buttons do not move',
+        !(await btn()).hidden && inR[0] >= fsR[2] && inR[1] === fsR[1] && JSON.stringify(before.slice(0, 4)) === JSON.stringify(after.slice(0, 4)), JSON.stringify(after));
+
+      const badSizes = [];
+      for (const [w, h] of [[440, 620], [440, 500], [640, 300], [900, 150], [1280, 720], [1920, 1080], [260, 260], [150, 900], [80, 80], [500, 500]]) {
+        await p.setViewportSize({ width: w, height: h }); await sleep(120);
+        const ok = await p.evaluate(() => {
+          const b = document.getElementById('installBtn').getBoundingClientRect(), f = document.getElementById('face').getBoundingClientRect();
+          return b.width > 0 && b.left >= f.left - 0.5 && b.right <= f.right + 0.5 && b.top >= f.top - 0.5 && b.bottom <= f.bottom + 0.5 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5;
+        });
+        if (!ok) badSizes.push(`${w}x${h}`);
+      }
+      await p.setViewportSize({ width: 420, height: 420 }); await sleep(150);
+      t.check('install button: inside the clock and the window while shown (10 sizes)', badSizes.length === 0, badSizes.join(' ') || 'ok');
+
+      await revealControls(p); await p.click('#installBtn'); await p.click('#installBtn'); s = await btn(); v = await view(p);
+      t.check('install button: a click opens the dialog once (a second click while it is open does nothing), the button stays, the timer is untouched',
+        s.prompts === 1 && !s.hidden && v.status === 'ready', `prompts=${s.prompts} ${v.status}`);
+
+      await choose('dismissed'); await offer();            // Chromium sends a new offer when the dialog is cancelled
+      await p.focus('#installBtn'); await p.keyboard.press('Enter'); const opened = (await btn()).prompts;
+      await choose('dismissed'); await offer(); await sleep(1300); s = await btn();
+      t.check('install button: keyboard: Enter opens the dialog; after a cancel the button is still there with focus', opened === 2 && !s.hidden && s.focused, `prompts=${opened} focus=${s.focusId}`);
+
+      await offer(true); await revealControls(p); await p.click('#installBtn'); await sleep(100); const kept = await btn();
+      await p.click('#installBtn'); await sleep(100); s = await btn();
+      t.check('install button: if the browser refuses to open the dialog, the button stays and the offer can be tried again', !kept.hidden && kept.prompts === 3 && s.prompts === 4 && !s.hidden, `prompts=${kept.prompts},${s.prompts}`);
+
+      await offer(); await p.click('#installBtn'); await choose('dismissed'); await sleep(1300); s = await btn();
+      t.check('install button: a cancel that brings no new offer hides the button (it would do nothing)', s.hidden);
+
+      await offer(); await p.focus('#installBtn'); await p.evaluate(() => dispatchEvent(new Event('appinstalled'))); s = await btn();
+      const c = await p.evaluate(() => getComputedStyle(document.getElementById('controls')).opacity);
+      t.check('install button: once installed it hides; keyboard focus moves to the fullscreen button, so the controls stay shown', s.hidden && s.focusId === 'fsBtn' && c === '1', `focus=${s.focusId} opacity=${c}`);
+      await p.evaluate(() => document.activeElement.blur());
+    }
+
     if (target.mode === 'server') {
       // --- the page is app/countdown.html: "/" serves it, and the manifest's start_url and
       //     shortcuts point at it by name (so they also work on servers without that default)
