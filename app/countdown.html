@@ -79,8 +79,9 @@
           <button class="icon" id="resetBtn" title="Reset (R / Esc)" aria-label="Reset"><svg aria-hidden="true"><use href="#i-reset"/></svg></button>
           <button class="icon" id="muteBtn" title="Mute (M)" aria-label="Mute" aria-pressed="false"><svg aria-hidden="true"><use href="#i-sound"/></svg></button>
           <button class="icon" id="fsBtn" title="Fullscreen (F)" aria-label="Fullscreen"><svg aria-hidden="true"><use href="#i-fs"/></svg></button>
-          <!-- Hidden unless the browser says the page can be installed and isn't yet; see "install" in app.js. -->
-          <button class="icon" id="installBtn" title="Install as an app" aria-label="Install as an app" hidden><svg aria-hidden="true"><use href="#i-install"/></svg></button>
+          <!-- Hidden unless the browser says the page can be installed and isn't yet; see "install" in app.js.
+               The slot hangs off the end of the row, so the other buttons don't move when it appears (see styles.css). -->
+          <span class="install-slot"><button class="icon" id="installBtn" title="Install as an app" aria-label="Install as an app" hidden><svg aria-hidden="true"><use href="#i-install"/></svg></button></span>
         </div>
       </div>
     </div>

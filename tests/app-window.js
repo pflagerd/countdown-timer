@@ -25,6 +25,15 @@ const { chromium, sleep, startTarget, launchOptions, reporter, view } = require(
   try {
     ctx = await launch(URL + '?t=25m&autostart=1'); let p = await appPage(ctx); await sleep(1500);
     let v = await view(p); t.check('app window starts the timer from ?t=25m&autostart=1', v.status.startsWith('ends'), v.digits);
+    // The install button, with the browser's real offer (beforeinstallprompt) instead of the
+    // stand-ins in regress.js: in a fresh profile the app isn't installed, so a served page
+    // must get the offer; a file:// page never does.
+    const offered = await p.evaluate(async () => {
+      for (let i = 0; i < 30; i++) { if (!document.getElementById('installBtn').hidden) return true; await new Promise((r) => setTimeout(r, 100)); }
+      return false;
+    });
+    if (target.mode === 'server') t.check('install button: shown in the app window once the real browser offers to install', offered);
+    else t.check('install button: never shown in the app window on file:// (not installable)', !offered);
     t.check('app window has a single history entry', (await p.evaluate(() => history.length)) === 1);
     await p.reload(); await sleep(400); v = await view(p);
     t.check('#8 reload keeps the timer running', v.status.startsWith('ends'), v.status);

@@ -234,6 +234,16 @@ button.icon {
 button.icon.primary { width: 3.9em; }
 /* "display: inline-grid" above would otherwise override the hidden attribute (the install button starts hidden). */
 button.icon[hidden] { display: none; }
+
+/* The install button comes and goes (see "install" in app.js). Inside the row
+   it would re-centre the row each time, sliding the other buttons sideways
+   under the pointer. So its slot is taken out of the row's layout and hung off
+   the row's right end. The slot's left padding is the usual gap between
+   buttons; being part of the controls, a click in that gap doesn't start the
+   timer. With the button hidden, the slot is removed as well. */
+.actions { position: relative; }
+.install-slot { position: absolute; left: 100%; top: 0; padding-left: 0.45em; display: flex; }
+.install-slot:has([hidden]) { display: none; }
 button.icon svg {
   width: 1.35em;
   height: 1.35em;

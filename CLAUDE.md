@@ -73,7 +73,7 @@ cd tests && npm ci && npm test         # headless suites, both modes (~2 min)
 npm run test:headed                    # also app-window.js and launcher-chime.js (needs a display; Xvfb works)
 ```
 Last full headless run: all 7 suite runs passed. Expected counts:
-- regress: 44 (file), 50 (server)
+- regress: 48 (file), 54 (server)
 - lockdown: 20
 - sound: 7
 - launcher: 26
@@ -101,6 +101,9 @@ Last full headless run: all 7 suite runs passed. Expected counts:
 - **Installing:**
   - The launcher's `--app=` window has no address bar or ⋮ menu, and the page blocks right-click, so the browser offers no install control there (a correction made in Exchange 107). Hence the page's own install button.
   - The install button shows only after Chromium's `beforeinstallprompt` (fired only when installable and not yet installed in that profile). Never on `file://`.
+  - "Installed" is per browser profile: the launcher's window (the timer's own profile) can't see a copy installed in the owner's Chrome, so the button shows there and would install a second copy. Kept on purpose and documented (review finding 2, option A).
+  - The button sits in a slot hung off the end of the button row (absolutely positioned), so the row doesn't re-centre when it appears. It stays visible while the install dialog is open, so keyboard focus isn't lost.
+  - The headless suite never gets a real `beforeinstallprompt` (stand-in events in `regress.js`); `app-window.js` (headed) checks the real one.
   - Measured (Playwright Chromium, Xvfb, server mode): the event fires in a normal tab *and* in a `--app=` window. A `--app=` window reports `(display-mode: standalone)`, so that media query can't be used to detect "installed".
   - A Chrome install also drops a second, identical `.desktop` file into the user's Desktop folder (the owner's is `~/desktops/default`; Exchange 111).
 - **An installed app (Chromium/Chrome on Linux):**
@@ -112,7 +115,7 @@ Last full headless run: all 7 suite runs passed. Expected counts:
 ## Where things stand (2026-11-14)
 
 - **`main`** has everything up to PR #26 (merge commit 0664202): the service-worker page fix (`sw.js` v12).
-- **PR #25 (open, draft):** the install button, plus fixes to these notes. A review is posted on it; finding 1 was fixed by PR #26, findings 2–7 are open (finding 2 needs the owner's decision).
+- **PR #25 (open, draft):** the install button, plus fixes to these notes. A review is posted on it; finding 1 was fixed by PR #26, and findings 2–7 are dealt with on the branch (2 by documenting it).
 - **#20, "Use cases: status and checks (collector)":** the five use cases (in the owner's words), status, and a checklist. Its sub-issues:
   - **#16** KDE menu entry (two routes: Chromium install vs our own `.desktop`; also "where the repo lives").
   - **#17** VPS hosting. Prerequisite for use cases 2–5. Owner to answer: is there a domain? Which web server? Which deploy method?
